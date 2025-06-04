@@ -181,9 +181,7 @@ export default function BarqPixApp() {
                     <div className="relative">
                       <CalendarPlus className="w-12 h-12 mx-auto text-purple-600/40 transition-all duration-300 group-hover:text-purple-600/60" />
                     </div>
-                    <CardTitle className="mt-2">
-                      Sign Up to Create Events
-                    </CardTitle>
+                    <CardTitle className="mt-2">Create Events</CardTitle>
                     <CardDescription>
                       Create an account to organize events
                     </CardDescription>
