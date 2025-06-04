@@ -102,7 +102,7 @@ export default function QRCodeGenerator({
       )}`;
       setQrCodeUrl(mockQrCode);
 
-      // Add mock preview photos
+      // mock preview photos
       const mockPhotos = [
         "/placeholder.svg?height=300&width=300",
         "/placeholder.svg?height=300&width=300",
@@ -319,7 +319,7 @@ export default function QRCodeGenerator({
                 </Button>
               </div>
 
-              {/* Add Preview Section for Guests */}
+              {/* Preview Section for Guests */}
               {(!user || user.isGuest) && (
                 <div className="space-y-4">
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
