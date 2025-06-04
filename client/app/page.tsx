@@ -92,9 +92,10 @@ export default function BarqPixApp() {
                   className="h-16 object-contain mb-4"
                 />
               </div>
-              <p className="text-xl text-foreground max-w-2xl mx-auto">
+              <p className="text-lg text-foreground max-w-2xl mx-auto">
                 Capture, organize, and share event photos seamlessly with
-                personalized QR codes
+                personalized QR codes, AI-powered organization makes finding the
+                perfect shots effortless.
               </p>
             </div>
 
