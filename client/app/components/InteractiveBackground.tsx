@@ -12,7 +12,6 @@ export default function InteractiveBackground() {
       const x = e.clientX / window.innerWidth;
       const y = e.clientY / window.innerHeight;
 
-      // Create a subtle parallax effect on the gradient
       backgroundRef.current.style.setProperty("--x", `${x * 100}%`);
       backgroundRef.current.style.setProperty("--y", `${y * 100}%`);
     };
