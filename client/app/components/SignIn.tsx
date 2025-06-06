@@ -3,20 +3,25 @@
 import type React from "react";
 
 import { useState } from "react";
+import { Button } from "@/app/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+} from "@/app/components/ui/card";
+import { Input } from "@/app/components/ui/input";
+import { Label } from "@/app/components/ui/label";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/app/components/ui/tabs";
+import { Separator } from "@/app/components/ui/separator";
+import { Checkbox } from "@/app/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/app/components/ui/alert";
 import { Eye, EyeOff, Mail, Lock, ArrowLeft, AlertCircle } from "lucide-react";
 
 interface SignInProps {
@@ -151,11 +156,10 @@ export default function SignIn({
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="forgot">Forgot Password</TabsTrigger>
-            </TabsList>
-
+            </TabsList>{" "}
             <TabsContent value="signin" className="space-y-4">
               {error && (
-                <Alert variant="destructive">
+                <Alert className="border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
@@ -303,7 +307,6 @@ export default function SignIn({
                 </Button>
               </div>
             </TabsContent>
-
             <TabsContent value="forgot" className="space-y-4">
               {resetSent ? (
                 <div className="text-center space-y-4">
@@ -326,13 +329,13 @@ export default function SignIn({
                 </div>
               ) : (
                 <>
+                  {" "}
                   {error && (
-                    <Alert variant="destructive">
+                    <Alert className="border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>{error}</AlertDescription>
                     </Alert>
                   )}
-
                   <div className="text-center space-y-2">
                     <h3 className="font-medium">Forgot your password?</h3>
                     <p className="text-sm text-muted-foreground">
@@ -340,7 +343,6 @@ export default function SignIn({
                       reset your password.
                     </p>
                   </div>
-
                   <form onSubmit={handleForgotPassword} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="resetEmail">Email</Label>

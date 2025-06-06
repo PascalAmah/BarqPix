@@ -1,30 +1,30 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Button } from "@/app/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  QrCode,
-  Download,
-  Share,
-  Plus,
-  Users,
-  User as UserIcon,
-} from "lucide-react";
+} from "@/app/components/ui/card";
+import { Input } from "@/app/components/ui/input";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
+} from "@/app/components/ui/select";
+import {
+  QrCode,
+  Download,
+  Share,
+  User as UserIcon,
+  Plus,
+  Users,
+} from "lucide-react";
 import { toast } from "sonner";
 import type { User as UserType, Event } from "../types";
 type User = UserType;

@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Button } from "@/app/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+} from "@/app/components/ui/card";
+import { Input } from "@/app/components/ui/input";
+import { Textarea } from "@/app/components/ui/textarea";
 import { ImageIcon, Download, Share, Search } from "lucide-react";
 
 interface PhotoGalleryProps {

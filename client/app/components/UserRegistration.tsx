@@ -3,20 +3,25 @@
 import type React from "react";
 
 import { useState } from "react";
+import { Button } from "@/app/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+} from "@/app/components/ui/card";
+import { Input } from "@/app/components/ui/input";
+import { Label } from "@/app/components/ui/label";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/app/components/ui/tabs";
+import { Separator } from "@/app/components/ui/separator";
+import { Checkbox } from "@/app/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/app/components/ui/alert";
 import {
   User,
   UserPlus,
@@ -178,13 +183,13 @@ export default function UserRegistration({
             </TabsList>
 
             <TabsContent value="register" className="space-y-4">
+              {" "}
               {error && (
-                <Alert variant="destructive">
+                <Alert className="border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
-
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name</Label>
@@ -326,7 +331,6 @@ export default function UserRegistration({
                   {loading ? "Creating Account..." : "Create Account"}
                 </Button>
               </form>
-
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <Separator className="w-full" />
@@ -337,7 +341,6 @@ export default function UserRegistration({
                   </span>
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <Button
                   variant="outline"
@@ -382,7 +385,6 @@ export default function UserRegistration({
                   Facebook
                 </Button>
               </div>
-
               <div className="text-center text-sm">
                 <span className="text-muted-foreground">
                   Already have an account?{" "}
