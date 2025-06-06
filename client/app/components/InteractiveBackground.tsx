@@ -25,9 +25,9 @@ export default function InteractiveBackground() {
       ref={backgroundRef}
       className="fixed inset-0 -z-10 bg-[#F4F1FF] overflow-hidden"
       style={{
-        background: `radial-gradient(circle at var(--x, 50%) var(--y, 50%), #7754F6 0%, transparent 30%),
-                    radial-gradient(circle at calc(100% - var(--x, 50%)) calc(100% - var(--y, 50%)), #B4ED1C 0%, transparent 20%),
-                    radial-gradient(circle at calc(var(--x, 50%)) calc(100% - var(--y, 50%)), #F6DD4B 0%, transparent 20%),
+        background: `radial-gradient(circle at var(--x, 50%) var(--y, 50%), #7754F6 0%, transparent 20%),
+                    radial-gradient(circle at calc(100% - var(--x, 50%)) calc(100% - var(--y, 50%)), #B4ED1C 0%, transparent 10%),
+                    radial-gradient(circle at calc(var(--x, 50%)) calc(100% - var(--y, 50%)), #F6DD4B 0%, transparent 10%),
                     #F4F1FF`,
         transition: "background-position 0.3s ease",
       }}

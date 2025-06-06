@@ -7,8 +7,8 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+} from "@/app/components/ui/card";
+import { Button } from "@/app/components/ui/button";
 import { Camera, QrCode, Users, ImageIcon, CalendarPlus } from "lucide-react";
 import type { User } from "./types";
 import UserRegistration from "./components/UserRegistration";
