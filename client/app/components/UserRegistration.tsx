@@ -9,14 +9,19 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+} from "@/app/components/ui/card";
+import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
+import { Label } from "@/app/components/ui/label";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/app/components/ui/tabs";
+import { Separator } from "@/app/components/ui/separator";
+import { Checkbox } from "@/app/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/app/components/ui/alert";
 import {
   User,
   UserPlus,
@@ -179,7 +184,7 @@ export default function UserRegistration({
 
             <TabsContent value="register" className="space-y-4">
               {error && (
-                <Alert variant="destructive">
+                <Alert className="border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
