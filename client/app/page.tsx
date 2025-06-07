@@ -87,7 +87,7 @@ export default function BarqPixApp() {
             <div className="text-center space-y-4">
               <div className="flex justify-center">
                 <img
-                  src="/logo.jpg"
+                  src="/barqpix_logo1.webp"
                   alt="BarqPix"
                   className="h-16 object-contain mb-4"
                 />
