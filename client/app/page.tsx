@@ -87,7 +87,7 @@ export default function BarqPixApp() {
             <div className="text-center space-y-4">
               <div className="flex justify-center">
                 <img
-                  src="/logo.jpg"
+                  src="/barqpix_logo1.webp"
                   alt="BarqPix"
                   className="h-16 object-contain mb-4"
                 />
@@ -174,12 +174,12 @@ export default function BarqPixApp() {
                 </Card>
               ) : (
                 <Card
-                  className="cursor-pointer group relative transition-all duration-300 hover:-translate-y-1 border-dashed border-2 border-purple-200 hover:border-purple-300 hover:shadow-[0_0_30px_rgba(119,84,246,0.1)] before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-br before:from-purple-50/50 before:to-transparent before:opacity-0 hover:before:opacity-100 before:transition-opacity"
+                  className="cursor-pointer group relative transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(119,84,246,0.15)] before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-br before:from-purple-100/50 before:to-transparent before:opacity-0 hover:before:opacity-100 before:transition-opacity"
                   onClick={() => setCurrentView("register")}
                 >
                   <CardHeader className="text-center relative">
                     <div className="relative">
-                      <CalendarPlus className="w-12 h-12 mx-auto text-purple-600/40 transition-all duration-300 group-hover:text-purple-600/60" />
+                      <CalendarPlus className="w-12 h-12 mx-auto text-purple-600 transition-transform duration-300 group-hover:scale-110" />
                     </div>
                     <CardTitle className="mt-2">Create Events</CardTitle>
                     <CardDescription>
@@ -209,7 +209,7 @@ export default function BarqPixApp() {
                 onClick={() => handleNavigate("scanner")}
               >
                 <CardHeader className="text-center relative">
-                  <Camera className="w-12 h-12 mx-auto text-purple-600 transition-transform duration-300 group-hover:scale-110" />
+                  <Camera className="w-12 h-12 mx-auto text-yellow-600 transition-transform duration-300 group-hover:scale-110" />
                   <CardTitle>Scan & Capture</CardTitle>
                   <CardDescription>
                     {user
