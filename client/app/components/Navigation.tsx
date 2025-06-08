@@ -97,9 +97,9 @@ export default function Navigation({
               <Home className="w-4 h-4 mr-2" />
               Home
             </Button>
-            <Button variant="outline" onClick={() => onViewChange("register")}>
+            <Button variant="outline" onClick={() => onViewChange("signin")}>
               <User className="w-4 h-4 mr-2" />
-              Get Started
+              Sign In
             </Button>
           </div>
         )}

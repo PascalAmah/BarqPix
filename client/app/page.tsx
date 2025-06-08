@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../lib/firebase";
+
 import {
   Card,
   CardContent,
@@ -19,11 +22,51 @@ import PhotoGallery from "./components/PhotoGallery";
 import Navigation from "./components/Navigation";
 import CreateEvent from "./components/CreateEvent";
 import InteractiveBackground from "./components/InteractiveBackground";
+import SignIn from "./components/SignIn";
+import { Toaster } from "sonner";
 
 export default function BarqPixApp() {
   const [currentView, setCurrentView] = useState<string>("home");
   const [user, setUser] = useState<User | null>(null);
   const [scannedUserId, setScannedUserId] = useState<string | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
+
+  // Firebase Auth State Listener for Persistence & Guest Mode Persistence
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        const appUser: User = {
+          id: firebaseUser.uid,
+          email: firebaseUser.email || "",
+          name:
+            firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "",
+          isGuest: false,
+          createdAt:
+            firebaseUser.metadata.creationTime || new Date().toISOString(),
+        };
+        setUser(appUser);
+        localStorage.removeItem("barqpix_guest_user");
+      } else {
+        const storedGuestUser = localStorage.getItem("barqpix_guest_user");
+        if (storedGuestUser) {
+          try {
+            const guestUser: User = JSON.parse(storedGuestUser);
+            setUser(guestUser);
+          } catch (e) {
+            console.error("Failed to parse stored guest user data", e);
+            localStorage.removeItem("barqpix_guest_user");
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      }
+      setLoadingUser(false);
+    });
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, []);
 
   // Redirect to registration if guest user tries to access restricted features
   const handleNavigate = (view: string) => {
@@ -41,7 +84,7 @@ export default function BarqPixApp() {
     }
   };
 
-  // Add scroll to top effect when view changes
+  // Scroll to top when view changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentView]);
@@ -53,6 +96,14 @@ export default function BarqPixApp() {
           <UserRegistration
             onUserCreated={setUser}
             onViewChange={setCurrentView}
+          />
+        );
+      case "signin":
+        return (
+          <SignIn
+            onUserSignedIn={setUser}
+            onViewChange={setCurrentView}
+            onBackToRegister={() => setCurrentView("register")}
           />
         );
       case "qr-generator":
@@ -240,24 +291,44 @@ export default function BarqPixApp() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col relative">
-      <InteractiveBackground />
-      <Navigation
-        currentView={currentView}
-        onViewChange={setCurrentView}
-        user={user}
-        onLogout={() => setUser(null)}
-      />
-      <main className="container mx-auto px-4 py-8 mt-12">
-        {renderCurrentView()}
-      </main>
-      <footer className="mt-auto border-t border-[#7754F6]/10 py-4">
-        <div className="container mx-auto px-4">
-          <p className="text-center text-sm text-gray-600">
-            © {new Date().getFullYear()} BarqPix. All rights reserved.
-          </p>
-        </div>
-      </footer>
-    </div>
+    <>
+      <div className="min-h-screen flex flex-col relative">
+        {loadingUser ? (
+          <div className="flex flex-col bg-secondary items-center justify-center min-h-screen">
+            <img
+              src="/barqpix_logo1.webp"
+              alt="BarqPix"
+              className="animate-pulse h-16"
+              style={{ filter: "drop-shadow(0 0 8px #7754F6)" }}
+            />
+          </div>
+        ) : (
+          <>
+            <InteractiveBackground />
+            <Navigation
+              currentView={currentView}
+              onViewChange={setCurrentView}
+              user={user}
+              onLogout={async () => {
+                await auth.signOut();
+                localStorage.removeItem("barqpix_guest_user");
+                setUser(null);
+              }}
+            />
+            <main className="container mx-auto px-4 py-8 mt-12">
+              {renderCurrentView()}
+            </main>
+            <footer className="mt-auto border-t border-[#7754F6]/10 py-4">
+              <div className="container mx-auto px-4">
+                <p className="text-center text-sm text-gray-600">
+                  © {new Date().getFullYear()} BarqPix. All rights reserved.
+                </p>
+              </div>
+            </footer>
+          </>
+        )}
+      </div>
+      <Toaster />
+    </>
   );
 }
