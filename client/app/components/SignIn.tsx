@@ -137,7 +137,7 @@ export default function SignIn({
           <div className="flex items-center justify-center gap-2">
             <div className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
               <img
-                src="/logo.jpg"
+                src="/barqpix_logo1.webp"
                 alt="BarqPix"
                 className="h-12 object-contain mx-auto"
               />
