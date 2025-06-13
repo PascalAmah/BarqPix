@@ -29,12 +29,12 @@ import {
   EyeOff,
   AlertCircle,
 } from "lucide-react";
-import SignIn from "./SignIn";
-import { signup } from "../../lib/auth";
+import { signup } from "../../lib/auth.firebase";
 import { FirebaseError } from "firebase/app";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { auth } from "../../lib/firebase";
+import { auth } from "../../lib/utils/firebase";
 import { toast } from "sonner";
+import { authApi } from "../../lib/api/auth";
 
 interface UserRegistrationProps {
   onUserCreated: (user: any) => void;
@@ -95,6 +95,7 @@ export default function UserRegistration({
 
       onUserCreated(user);
       onViewChange("home");
+      toast.success("Sign Up successfully!");
     } catch (err: any) {
       if (err instanceof FirebaseError) {
         toast.error(err.message);
@@ -130,12 +131,13 @@ export default function UserRegistration({
       const result = await signInWithPopup(auth, googleProvider);
       const firebaseUser = result.user;
 
+      // Create user in backend
+      await authApi.createUser(firebaseUser);
+
       const user = {
         id: firebaseUser.uid,
         name: firebaseUser.displayName || firebaseUser.email?.split("@")[0],
         email: firebaseUser.email,
-        eventCode: "SOCIAL",
-        provider: "google",
         createdAt: firebaseUser.metadata.creationTime,
         isNewUser: true,
       };
