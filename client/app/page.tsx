@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../lib/firebase";
+import { auth } from "../lib/utils/firebase";
 
 import {
   Card,
@@ -13,7 +13,7 @@ import {
 } from "@/app/components/ui/card";
 import { Button } from "@/app/components/ui/button";
 import { Camera, QrCode, Users, ImageIcon, CalendarPlus } from "lucide-react";
-import type { User } from "./types";
+import type { User, Event as EventType } from "./types";
 import UserRegistration from "./components/UserRegistration";
 import QRCodeGenerator from "./components/QRCodeGenerator";
 import BarcodeScanner from "./components/BarcodeScanner";
@@ -23,13 +23,21 @@ import Navigation from "./components/Navigation";
 import CreateEvent from "./components/CreateEvent";
 import InteractiveBackground from "./components/InteractiveBackground";
 import SignIn from "./components/SignIn";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
+import EventList from "./components/EventList";
 
 export default function BarqPixApp() {
-  const [currentView, setCurrentView] = useState<string>("home");
+  const [currentView, setCurrentView] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("barqpix_current_view") || "home";
+    }
+    return "home";
+  });
   const [user, setUser] = useState<User | null>(null);
   const [scannedUserId, setScannedUserId] = useState<string | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
+  const [editEvent, setEditEvent] = useState<EventType | null>(null);
+  const [refreshEvents, setRefreshEvents] = useState(0);
 
   // Firebase Auth State Listener for Persistence & Guest Mode Persistence
   useEffect(() => {
@@ -87,7 +95,32 @@ export default function BarqPixApp() {
   // Scroll to top when view changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
+    localStorage.setItem("barqpix_current_view", currentView);
   }, [currentView]);
+
+  const handleEditEvent = (event: EventType) => {
+    setEditEvent(event);
+    setCurrentView("create-event");
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    try {
+      const res = await fetch(`/api/events/${eventId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${user?.token}` },
+      });
+      if (!res.ok) throw new Error("Failed to delete event");
+      toast.success("Event deleted successfully");
+      setRefreshEvents((c) => c + 1);
+    } catch (error) {
+      toast.error("Failed to delete event");
+    }
+  };
+
+  const handleViewChange = (view: string) => {
+    setCurrentView(view);
+    if (view !== "create-event") setEditEvent(null);
+  };
 
   const renderCurrentView = () => {
     switch (currentView) {
@@ -130,7 +163,22 @@ export default function BarqPixApp() {
       case "gallery":
         return <PhotoGallery userId={user?.id ?? null} />;
       case "create-event":
-        return <CreateEvent user={user} onViewChange={setCurrentView} />;
+        return (
+          <CreateEvent
+            user={user}
+            onViewChange={handleViewChange}
+            eventToEdit={editEvent}
+          />
+        );
+      case "event-list":
+        return (
+          <EventList
+            user={user}
+            onEdit={handleEditEvent}
+            onDelete={handleDeleteEvent}
+            refreshEvents={refreshEvents}
+          />
+        );
       default:
         return (
           <div className="space-y-8">
@@ -184,6 +232,13 @@ export default function BarqPixApp() {
                       >
                         <ImageIcon className="w-4 h-4 mr-2" />
                         My Photos
+                      </Button>
+                      <Button
+                        onClick={() => handleNavigate("event-list")}
+                        variant="outline"
+                      >
+                        <Users className="w-4 h-4 mr-2" />
+                        My Events
                       </Button>
                     </>
                   ) : (

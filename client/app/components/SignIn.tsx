@@ -21,10 +21,10 @@ import { Separator } from "@/app/components/ui/separator";
 import { Checkbox } from "@/app/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/app/components/ui/alert";
 import { Eye, EyeOff, Mail, Lock, ArrowLeft, AlertCircle } from "lucide-react";
-import { signin, resetPassword } from "../../lib/auth";
+import { signin, resetPassword } from "../../lib/auth.firebase";
 import { FirebaseError } from "firebase/app";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
-import { auth } from "../../lib/firebase";
+import { auth } from "../../lib/utils/firebase";
 import { toast } from "sonner";
 
 interface SignInProps {
