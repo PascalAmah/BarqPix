@@ -4,9 +4,9 @@ import {
   signInWithEmailAndPassword,
   updateProfile,
   sendPasswordResetEmail,
-  User,
 } from "firebase/auth";
-import { auth } from "./firebase";
+import { auth } from "./utils/firebase";
+import { authApi } from "./api/auth";
 
 // Sign up
 export const signup = async (
@@ -19,9 +19,14 @@ export const signup = async (
     email,
     password
   );
+
   if (displayName) {
     await updateProfile(userCredential.user, { displayName });
   }
+
+  // Create user in backend
+  await authApi.createUser(userCredential.user);
+
   return userCredential.user;
 };
 
@@ -32,6 +37,11 @@ export const signin = async (email: string, password: string) => {
     email,
     password
   );
+
+  // Get user data from backend
+  const token = await userCredential.user.getIdToken();
+  await authApi.getCurrentUser(token);
+
   return userCredential.user;
 };
 
@@ -42,7 +52,13 @@ export const editUserProfile = async (updates: {
 }) => {
   const user = auth.currentUser;
   if (!user) throw new Error("No authenticated user.");
+
   await updateProfile(user, updates);
+
+  // Update user in backend
+  const token = await user.getIdToken();
+  await authApi.updateUser(token, updates);
+
   return user;
 };
 
