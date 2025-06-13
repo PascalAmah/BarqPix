@@ -86,11 +86,6 @@ export default function Navigation({
                 </DropdownMenu>
               </div>
             </div>
-            {/* <div className="flex items-center justify-center">
-              <span className="text-sm text-muted-foreground">
-                Welcome, {user.name}
-              </span>
-            </div> */}
           </div>
         ) : (
           <div className="flex justify-between items-center">
@@ -102,7 +97,7 @@ export default function Navigation({
               <Home className="w-4 h-4 mr-2" />
               Home
             </Button>
-            <Button variant="outline" onClick={() => onViewChange("register")}>
+            <Button variant="outline" onClick={() => onViewChange("signin")}>
               <User className="w-4 h-4 mr-2" />
               Sign In
             </Button>

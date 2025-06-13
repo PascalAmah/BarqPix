@@ -4,6 +4,7 @@ export interface User {
   isGuest?: boolean;
   avatar?: string;
   email?: string;
+  createdAt?: string;
 }
 
 export interface Event {
