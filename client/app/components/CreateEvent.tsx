@@ -68,6 +68,15 @@ export default function CreateEvent({
     };
   });
 
+  React.useEffect(() => {
+    return () => {
+      localStorage.removeItem("eventFormData");
+      if (formData.coverImagePreview) {
+        URL.revokeObjectURL(formData.coverImagePreview);
+      }
+    };
+  }, []);
+
   const { getRootProps, getInputProps } = useDropzone({
     accept: {
       "image/*": [".jpeg", ".jpg", ".png", ".gif"],
@@ -95,12 +104,10 @@ export default function CreateEvent({
     },
   });
 
-  // Save form data to localStorage whenever it changes
   React.useEffect(() => {
     const dataToSave = {
       ...formData,
       coverImage: null,
-
       coverImageUrl: formData.coverImagePreview,
     };
     localStorage.setItem("eventFormData", JSON.stringify(dataToSave));

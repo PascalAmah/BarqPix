@@ -1,14 +1,48 @@
-// lib/auth.ts
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   updateProfile,
   sendPasswordResetEmail,
+  onAuthStateChanged,
 } from "firebase/auth";
 import { auth } from "./utils/firebase";
 import { authApi } from "./api/auth";
 
-// Sign up
+let tokenRefreshTimeout: NodeJS.Timeout;
+
+const setupTokenRefresh = (user: any) => {
+  if (tokenRefreshTimeout) {
+    clearTimeout(tokenRefreshTimeout);
+  }
+
+  const refreshToken = async () => {
+    try {
+      const newToken = await user.getIdToken(true);
+      const storedUser = localStorage.getItem("barqpix_user");
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        userData.token = newToken;
+        localStorage.setItem("barqpix_user", JSON.stringify(userData));
+      }
+    } catch (error) {
+      console.error("Error refreshing token:", error);
+    }
+  };
+
+  const expiresIn = 60 * 60 * 1000; // 1 hour in milliseconds
+  tokenRefreshTimeout = setTimeout(refreshToken, expiresIn - 5 * 60 * 1000);
+};
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    setupTokenRefresh(user);
+  } else {
+    if (tokenRefreshTimeout) {
+      clearTimeout(tokenRefreshTimeout);
+    }
+  }
+});
+
 export const signup = async (
   email: string,
   password: string,
@@ -24,13 +58,11 @@ export const signup = async (
     await updateProfile(userCredential.user, { displayName });
   }
 
-  // Create user in backend
   await authApi.createUser(userCredential.user);
 
   return userCredential.user;
 };
 
-// Sign in
 export const signin = async (email: string, password: string) => {
   const userCredential = await signInWithEmailAndPassword(
     auth,
@@ -38,14 +70,17 @@ export const signin = async (email: string, password: string) => {
     password
   );
 
-  // Get user data from backend
   const token = await userCredential.user.getIdToken();
   await authApi.getCurrentUser(token);
 
-  return userCredential.user;
+  setupTokenRefresh(userCredential.user);
+
+  return {
+    user: userCredential.user,
+    token,
+  };
 };
 
-// Edit user
 export const editUserProfile = async (updates: {
   displayName?: string;
   photoURL?: string;
@@ -55,14 +90,12 @@ export const editUserProfile = async (updates: {
 
   await updateProfile(user, updates);
 
-  // Update user in backend
   const token = await user.getIdToken();
   await authApi.updateUser(token, updates);
 
   return user;
 };
 
-// Reset password
 export const resetPassword = async (email: string) => {
   await sendPasswordResetEmail(auth, email);
 };
