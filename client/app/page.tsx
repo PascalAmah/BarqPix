@@ -23,8 +23,9 @@ import Navigation from "./components/Navigation";
 import CreateEvent from "./components/CreateEvent";
 import InteractiveBackground from "./components/InteractiveBackground";
 import SignIn from "./components/SignIn";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import EventList from "./components/EventList";
+import { eventApi } from "@/lib/api/event";
 
 export default function BarqPixApp() {
   const [currentView, setCurrentView] = useState<string>(() => {
@@ -104,12 +105,12 @@ export default function BarqPixApp() {
   };
 
   const handleDeleteEvent = async (eventId: string) => {
+    if (!user?.token) {
+      toast.error("You must be logged in to delete events");
+      return;
+    }
     try {
-      const res = await fetch(`/api/events/${eventId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${user?.token}` },
-      });
-      if (!res.ok) throw new Error("Failed to delete event");
+      await eventApi.deleteEvent(eventId, user.token);
       toast.success("Event deleted successfully");
       setRefreshEvents((c) => c + 1);
     } catch (error) {
@@ -176,6 +177,7 @@ export default function BarqPixApp() {
             user={user}
             onEdit={handleEditEvent}
             onDelete={handleDeleteEvent}
+            onViewChange={handleViewChange}
             refreshEvents={refreshEvents}
           />
         );
@@ -383,7 +385,6 @@ export default function BarqPixApp() {
           </>
         )}
       </div>
-      <Toaster />
     </>
   );
 }

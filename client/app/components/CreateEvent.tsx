@@ -182,28 +182,30 @@ export default function CreateEvent({
         galleryVisibility: formData.galleryVisibility,
       };
 
-      let response;
+      let eventId;
       if (eventToEdit) {
         // Update existing event
-        response = await eventApi.updateEvent(
+        const response = await eventApi.updateEvent(
           eventToEdit.id,
           { ...eventData, id: eventToEdit.id } as Event,
-          `Bearer ${user.token}`
+          user.token
         );
+        eventId = eventToEdit.id;
         toast.success("Event updated successfully!");
       } else {
         // Create new event
-        response = await eventApi.createEvent(
+        const response = await eventApi.createEvent(
           eventData as Event,
-          `Bearer ${user.token}`
+          user.token
         );
+        eventId = response.id;
         toast.success("Event created successfully!");
       }
 
       if (formData.coverImage) {
         try {
           await photoApi.uploadEventCover(
-            response.id,
+            eventId,
             formData.coverImage,
             user.token
           );

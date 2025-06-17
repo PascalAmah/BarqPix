@@ -95,10 +95,12 @@ export const eventController = {
       const eventsSnapshot = await db
         .collection("events")
         .where("organizer", "==", uid)
-        .orderBy("createdAt", "desc")
         .get();
 
       const events = eventsSnapshot.docs.map((doc) => doc.data());
+
+      // Sort events by createdAt in memory
+      events.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
       res.json({ events });
     } catch (error) {

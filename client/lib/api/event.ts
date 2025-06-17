@@ -8,7 +8,7 @@ export const eventApi = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: token,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(event),
     });
@@ -44,7 +44,7 @@ export const eventApi = {
   },
 
   async getUserEvents(token: string) {
-    const response = await fetch(`${API_URL}/api/events/me`, {
+    const response = await fetch(`${API_URL}/api/events`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -60,7 +60,7 @@ export const eventApi = {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        Authorization: token,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(event),
     });
