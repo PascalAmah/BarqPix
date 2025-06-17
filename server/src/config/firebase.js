@@ -1,6 +1,5 @@
 import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
 import { getAuth } from "firebase-admin/auth";
 import * as dotenv from "dotenv";
 
@@ -16,10 +15,8 @@ const serviceAccount = JSON.parse(serviceAccountJSON);
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
-    storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
   });
 }
 
 export const db = getFirestore();
-export const storage = getStorage();
 export const auth = getAuth();

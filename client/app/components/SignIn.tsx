@@ -26,6 +26,7 @@ import { FirebaseError } from "firebase/app";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "../../lib/utils/firebase";
 import { toast } from "sonner";
+import { authApi } from "../../lib/api/auth";
 
 interface SignInProps {
   onUserSignedIn: (user: any) => void;
@@ -44,13 +45,11 @@ export default function SignIn({
   const [error, setError] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
 
-  // Email/Password Sign In State
   const [emailSignInData, setEmailSignInData] = useState({
     email: "",
     password: "",
   });
 
-  // Forgot Password State
   const [resetEmail, setResetEmail] = useState("");
   const [resetSent, setResetSent] = useState(false);
 
@@ -60,10 +59,20 @@ export default function SignIn({
     setError("");
 
     try {
-      const firebaseUser = await signin(
+      const { user: firebaseUser, token } = await signin(
         emailSignInData.email,
         emailSignInData.password
       );
+
+      if (!firebaseUser || !token) {
+        throw new Error("Authentication failed");
+      }
+
+      try {
+        await authApi.getCurrentUser(token);
+      } catch (error) {
+        throw new Error("Failed to get user data from server");
+      }
 
       const user = {
         id: firebaseUser.uid,
@@ -71,6 +80,7 @@ export default function SignIn({
         email: firebaseUser.email,
         createdAt: firebaseUser.metadata.creationTime,
         lastLogin: new Date().toISOString(),
+        token,
       };
 
       if (rememberMe) {
@@ -84,8 +94,17 @@ export default function SignIn({
       if (err instanceof FirebaseError) {
         toast.error(err.message);
       } else {
-        toast.error("Invalid email or password. Please try again.");
+        toast.error(
+          err.message || "Invalid email or password. Please try again."
+        );
       }
+
+      setEmailSignInData({
+        email: "",
+        password: "",
+      });
+
+      return;
     } finally {
       setLoading(false);
     }
@@ -120,6 +139,18 @@ export default function SignIn({
       const result = await signInWithPopup(auth, googleProvider);
       const firebaseUser = result.user;
 
+      if (!firebaseUser) {
+        throw new Error("Google authentication failed");
+      }
+
+      const idToken = await firebaseUser.getIdToken();
+
+      try {
+        await authApi.getCurrentUser(idToken);
+      } catch (error) {
+        throw new Error("Failed to get user data from server");
+      }
+
       const user = {
         id: firebaseUser.uid,
         name: firebaseUser.displayName || firebaseUser.email?.split("@")[0],
@@ -127,7 +158,12 @@ export default function SignIn({
         provider: "google",
         createdAt: firebaseUser.metadata.creationTime,
         lastLogin: new Date().toISOString(),
+        token: idToken,
       };
+
+      if (rememberMe) {
+        localStorage.setItem("barqpix_user", JSON.stringify(user));
+      }
 
       onUserSignedIn(user);
       onViewChange("home");
@@ -136,8 +172,12 @@ export default function SignIn({
       if (err instanceof FirebaseError) {
         toast.error(err.message);
       } else {
-        toast.error(`Failed to sign in with Google. Please try again.`);
+        toast.error(
+          err.message || "Failed to sign in with Google. Please try again."
+        );
       }
+
+      return;
     } finally {
       setLoading(false);
     }
