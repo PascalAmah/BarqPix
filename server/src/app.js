@@ -17,6 +17,7 @@ const wss = new WebSocketServer({ server: httpServer });
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // WebSocket connections store
 const connections = new Map();
