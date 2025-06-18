@@ -30,6 +30,7 @@ const EventList: React.FC<EventListProps> = ({
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -49,6 +50,16 @@ const EventList: React.FC<EventListProps> = ({
       fetchEvents();
     }
   }, [user, refreshEvents]);
+
+  const handleDelete = async (eventId: string) => {
+    setIsDeleting(true);
+    try {
+      await onDelete(eventId);
+      setConfirmDeleteId(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (!user) {
     return (
@@ -162,17 +173,16 @@ const EventList: React.FC<EventListProps> = ({
               <Button
                 variant="outline"
                 onClick={() => setConfirmDeleteId(null)}
+                disabled={isDeleting}
               >
                 Cancel
               </Button>
               <Button
                 variant="destructive"
-                onClick={() => {
-                  onDelete(confirmDeleteId);
-                  setConfirmDeleteId(null);
-                }}
+                onClick={() => handleDelete(confirmDeleteId)}
+                disabled={isDeleting}
               >
-                Delete
+                {isDeleting ? "Deleting..." : "Delete"}
               </Button>
             </div>
           </div>

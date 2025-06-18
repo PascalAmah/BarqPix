@@ -13,7 +13,8 @@ import {
 import { Input } from "@/app/components/ui/input";
 import { Textarea } from "@/app/components/ui/textarea";
 import { Calendar } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/app/components/ui/toast";
+// import { toast } from "sonner";
 import { eventApi } from "@/lib/api/event";
 import { Event } from "@/app/types";
 import { photoApi } from "@/lib/api/photo";
