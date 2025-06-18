@@ -23,7 +23,7 @@ import Navigation from "./components/Navigation";
 import CreateEvent from "./components/CreateEvent";
 import InteractiveBackground from "./components/InteractiveBackground";
 import SignIn from "./components/SignIn";
-import { toast } from "sonner";
+import { toast } from "./components/ui/toast";
 import EventList from "./components/EventList";
 import { eventApi } from "@/lib/api/event";
 
@@ -73,11 +73,9 @@ export default function BarqPixApp() {
       setLoadingUser(false);
     });
 
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, []);
 
-  // Redirect to registration if guest user tries to access restricted features
   const handleNavigate = (view: string) => {
     if (!user || user.isGuest) {
       switch (view) {
@@ -99,11 +97,13 @@ export default function BarqPixApp() {
     localStorage.setItem("barqpix_current_view", currentView);
   }, [currentView]);
 
+  // Handle edit event
   const handleEditEvent = (event: EventType) => {
     setEditEvent(event);
     setCurrentView("create-event");
   };
 
+  // Handle delete event
   const handleDeleteEvent = async (eventId: string) => {
     if (!user?.token) {
       toast.error("You must be logged in to delete events");
@@ -150,7 +150,6 @@ export default function BarqPixApp() {
           />
         );
       case "upload":
-        // Only show PhotoUpload if we have a scanned user ID or a logged-in user
         if (!scannedUserId && (!user || user.isGuest)) {
           setCurrentView("scanner");
           return null;
