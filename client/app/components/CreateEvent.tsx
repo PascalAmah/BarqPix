@@ -13,11 +13,16 @@ import {
 import { Input } from "@/app/components/ui/input";
 import { Textarea } from "@/app/components/ui/textarea";
 import { Calendar } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/app/components/ui/toast";
+// import { toast } from "sonner";
+import { eventApi } from "@/lib/api/event";
+import { Event } from "@/app/types";
+import { photoApi } from "@/lib/api/photo";
 
 interface CreateEventProps {
   user: any;
   onViewChange: (view: string) => void;
+  eventToEdit?: Event | null;
 }
 
 interface EventFormData {
@@ -25,26 +30,60 @@ interface EventFormData {
   description: string;
   startDate: string;
   endDate: string;
+  location: string;
+  galleryVisibility: "public" | "private";
   coverImage: File | null;
   coverImagePreview?: string;
+  coverImageUrl?: string;
 }
 
-export default function CreateEvent({ user, onViewChange }: CreateEventProps) {
+export default function CreateEvent({
+  user,
+  onViewChange,
+  eventToEdit,
+}: CreateEventProps) {
   const [loading, setLoading] = React.useState(false);
-  const [formData, setFormData] = React.useState<EventFormData>({
-    title: "",
-    description: "",
-    startDate: "",
-    endDate: "",
-    coverImage: null,
-    coverImagePreview: undefined,
+  const [formData, setFormData] = React.useState<EventFormData>(() => {
+    const savedData = localStorage.getItem("eventFormData");
+    if (savedData) {
+      const parsed = JSON.parse(savedData);
+      // If there was a saved cover image URL, restore it
+      if (parsed.coverImageUrl) {
+        return {
+          ...parsed,
+          coverImage: null,
+          coverImagePreview: parsed.coverImageUrl,
+        };
+      }
+      return parsed;
+    }
+    return {
+      title: "",
+      description: "",
+      startDate: "",
+      endDate: "",
+      location: "",
+      galleryVisibility: "public",
+      coverImage: null,
+      coverImagePreview: undefined,
+    };
   });
+
+  React.useEffect(() => {
+    return () => {
+      localStorage.removeItem("eventFormData");
+      if (formData.coverImagePreview) {
+        URL.revokeObjectURL(formData.coverImagePreview);
+      }
+    };
+  }, []);
 
   const { getRootProps, getInputProps } = useDropzone({
     accept: {
       "image/*": [".jpeg", ".jpg", ".png", ".gif"],
     },
     maxFiles: 1,
+    maxSize: 5 * 1024 * 1024, // 5MB
     onDrop: (acceptedFiles) => {
       if (acceptedFiles?.length > 0) {
         const file = acceptedFiles[0];
@@ -56,9 +95,25 @@ export default function CreateEvent({ user, onViewChange }: CreateEventProps) {
         }));
       }
     },
+    onDropRejected: (rejectedFiles) => {
+      const error = rejectedFiles[0].errors[0];
+      if (error.code === "file-too-large") {
+        toast.error("File size must be less than 5MB");
+      } else {
+        toast.error("Invalid file type. Please upload an image.");
+      }
+    },
   });
 
-  // Cleanup preview URL when component unmounts
+  React.useEffect(() => {
+    const dataToSave = {
+      ...formData,
+      coverImage: null,
+      coverImageUrl: formData.coverImagePreview,
+    };
+    localStorage.setItem("eventFormData", JSON.stringify(dataToSave));
+  }, [formData]);
+
   React.useEffect(() => {
     return () => {
       if (formData.coverImagePreview) {
@@ -67,40 +122,151 @@ export default function CreateEvent({ user, onViewChange }: CreateEventProps) {
     };
   }, [formData.coverImagePreview]);
 
+  React.useEffect(() => {
+    if (eventToEdit) {
+      setFormData({
+        title: eventToEdit.title,
+        description: eventToEdit.description,
+        startDate: eventToEdit.startDate,
+        endDate: eventToEdit.endDate,
+        location: eventToEdit.location,
+        galleryVisibility: eventToEdit.galleryVisibility,
+        coverImage: null,
+        coverImagePreview: eventToEdit.coverImage || undefined,
+      });
+    }
+  }, [eventToEdit]);
+
+  const validateForm = () => {
+    if (!formData.title || formData.title.length < 3) {
+      toast.error("Title must be at least 3 characters long");
+      return false;
+    }
+    if (!formData.description || formData.description.length < 10) {
+      toast.error("Description must be at least 10 characters long");
+      return false;
+    }
+    if (!formData.location || formData.location.length < 3) {
+      toast.error("Location must be at least 3 characters long");
+      return false;
+    }
+    if (!formData.startDate || !formData.endDate) {
+      toast.error("Please select both start and end dates");
+      return false;
+    }
+    if (new Date(formData.endDate) <= new Date(formData.startDate)) {
+      toast.error("End date must be after start date");
+      return false;
+    }
+    if (new Date(formData.startDate) < new Date()) {
+      toast.error("Start date cannot be in the past");
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
 
+    if (!validateForm()) {
+      return;
+    }
+
+    setLoading(true);
     try {
-      const formPayload = new FormData();
-      formPayload.append("title", formData.title);
-      formPayload.append("description", formData.description);
-      formPayload.append("startDate", formData.startDate);
-      formPayload.append("endDate", formData.endDate);
-      if (formData.coverImage) {
-        formPayload.append("coverImage", formData.coverImage);
+      const eventData: Partial<Event> = {
+        title: formData.title,
+        description: formData.description,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        location: formData.location,
+        galleryVisibility: formData.galleryVisibility,
+      };
+
+      let eventId;
+      if (eventToEdit) {
+        // Update existing event
+        const response = await eventApi.updateEvent(
+          eventToEdit.id,
+          { ...eventData, id: eventToEdit.id } as Event,
+          user.token
+        );
+        eventId = eventToEdit.id;
+        toast.success("Event updated successfully!");
+      } else {
+        // Create new event
+        const response = await eventApi.createEvent(
+          eventData as Event,
+          user.token
+        );
+        eventId = response.id;
+        toast.success("Event created successfully!");
       }
 
-      // TODO: Replace with your actual API call
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
-      toast.success("Event created successfully!");
-      onViewChange("qr-generator"); // Navigate to QR generator after success
-    } catch (error) {
-      console.error("Error creating event:", error);
-      toast.error("Failed to create event");
+      if (formData.coverImage) {
+        try {
+          await photoApi.uploadEventCover(
+            eventId,
+            formData.coverImage,
+            user.token
+          );
+          toast.success("Cover image uploaded successfully!");
+        } catch (error) {
+          toast.error("Failed to upload cover image");
+          return;
+        }
+      }
+
+      localStorage.removeItem("eventFormData");
+      onViewChange("event-list");
+    } catch (error: any) {
+      toast.error(
+        error.message ||
+          (eventToEdit ? "Failed to update event" : "Failed to create event")
+      );
     } finally {
       setLoading(false);
     }
   };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => {
+      const newData = {
+        ...prev,
+        [name]: value,
+      };
+
+      // If start date changes and end date is before it, update end date
+      if (
+        name === "startDate" &&
+        newData.endDate &&
+        new Date(value) > new Date(newData.endDate)
+      ) {
+        newData.endDate = value;
+      }
+
+      return newData;
+    });
+  };
+
+  const handleCancel = () => {
+    localStorage.removeItem("eventFormData");
+    setFormData({
+      title: "",
+      description: "",
+      startDate: "",
+      endDate: "",
+      location: "",
+      galleryVisibility: "public",
+      coverImage: null,
+      coverImagePreview: undefined,
+    });
+    onViewChange(eventToEdit ? "event-list" : "home");
   };
 
   if (!user) {
@@ -117,10 +283,13 @@ export default function CreateEvent({ user, onViewChange }: CreateEventProps) {
     <div className="mx-auto max-w-2xl w-full">
       <Card>
         <CardHeader>
-          <CardTitle>Create New Event</CardTitle>
+          <CardTitle>
+            {eventToEdit ? "Edit Event" : "Create New Event"}
+          </CardTitle>
           <CardDescription>
-            Set up your event details and get a unique QR code for guests to
-            share photos.
+            {eventToEdit
+              ? "Update your event details below."
+              : "Set up your event details and get a unique QR code for guests to share photos."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -133,6 +302,20 @@ export default function CreateEvent({ user, onViewChange }: CreateEventProps) {
                 onChange={handleChange}
                 placeholder="Summer Wedding 2025"
                 required
+                minLength={3}
+                maxLength={100}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Location</label>
+              <Input
+                name="location"
+                value={formData.location}
+                onChange={handleChange}
+                placeholder="Event location (e.g., Central Park, NYC)"
+                required
+                minLength={3}
+                maxLength={200}
               />
             </div>
             <div className="space-y-2">
@@ -143,8 +326,10 @@ export default function CreateEvent({ user, onViewChange }: CreateEventProps) {
                 onChange={handleChange}
                 placeholder="Share a brief description of your event..."
                 required
+                minLength={10}
+                maxLength={1000}
               />
-            </div>{" "}
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Start Date & Time</label>
@@ -172,81 +357,70 @@ export default function CreateEvent({ user, onViewChange }: CreateEventProps) {
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">
-                Cover Image (Optional)
-              </label>{" "}
+              <label className="text-sm font-medium">Gallery Visibility</label>
+              <select
+                name="galleryVisibility"
+                value={formData.galleryVisibility}
+                onChange={handleChange}
+                className="w-full border rounded-md p-2"
+                required
+              >
+                <option value="public">
+                  Public (anyone with link can view)
+                </option>
+                <option value="private">
+                  Private (only event participants)
+                </option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Cover Image</label>
               <div
                 {...getRootProps()}
-                className="flex h-32 w-full cursor-pointer items-center justify-center rounded-md border border-dashed border-border bg-muted/50 hover:bg-muted/70 relative overflow-hidden"
+                className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer hover:border-primary"
               >
                 <input {...getInputProps()} />
                 {formData.coverImagePreview ? (
-                  <div className="relative w-full h-full">
+                  <div className="relative">
                     <img
                       src={formData.coverImagePreview}
                       alt="Cover preview"
-                      className="w-full h-full object-cover"
+                      className="max-h-48 mx-auto rounded-lg"
                     />
-                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                      <p className="text-white text-sm">
-                        Click or drag to change
-                      </p>
-                    </div>
+                    <p className="text-sm text-gray-500 mt-2">
+                      Click or drag to replace
+                    </p>
                   </div>
                 ) : (
-                  <div className="text-center p-4">
-                    <div className="text-sm text-muted-foreground">
-                      Drag and drop an image or click to upload
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Supports: JPEG, PNG, GIF
-                    </div>
+                  <div>
+                    <Calendar className="mx-auto h-12 w-12 text-gray-400" />
+                    <p className="mt-2 text-sm text-gray-500">
+                      Click or drag to upload cover image
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Max file size: 5MB. Supported formats: JPG, PNG, GIF
+                    </p>
                   </div>
                 )}
               </div>
             </div>
-            <Button
-              className="w-full"
-              type="submit"
-              disabled={
-                loading ||
-                !formData.title ||
-                !formData.startDate ||
-                !formData.endDate
-              }
-            >
-              {" "}
-              {loading ? (
-                <>
-                  <svg
-                    className="animate-spin -ml-1 mr-3 h-4 w-4"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  Creating Event...
-                </>
-              ) : (
-                <>
-                  <Calendar className="mr-2 h-4 w-4" />
-                  Create Event & Generate QR Code
-                </>
-              )}
-            </Button>
+            <div className="flex gap-4">
+              <Button type="submit" className="flex-1" disabled={loading}>
+                {loading
+                  ? "Processing..."
+                  : eventToEdit
+                  ? "Update Event"
+                  : "Create Event"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={handleCancel}
+              >
+                Cancel
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
