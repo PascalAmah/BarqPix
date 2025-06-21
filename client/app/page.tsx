@@ -42,19 +42,39 @@ export default function BarqPixApp() {
 
   // Firebase Auth State Listener for Persistence & Guest Mode Persistence
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const appUser: User = {
-          id: firebaseUser.uid,
-          email: firebaseUser.email || "",
-          name:
-            firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "",
-          isGuest: false,
-          createdAt:
-            firebaseUser.metadata.creationTime || new Date().toISOString(),
-        };
-        setUser(appUser);
-        localStorage.removeItem("barqpix_guest_user");
+        const storedUser = localStorage.getItem("barqpix_user");
+        if (storedUser) {
+          try {
+            const userData = JSON.parse(storedUser);
+            if (userData.id === firebaseUser.uid) {
+              const appUser: User = {
+                id: firebaseUser.uid,
+                email: firebaseUser.email || "",
+                name:
+                  firebaseUser.displayName ||
+                  firebaseUser.email?.split("@")[0] ||
+                  "",
+                isGuest: false,
+                createdAt:
+                  firebaseUser.metadata.creationTime ||
+                  new Date().toISOString(),
+              };
+              setUser(appUser);
+              localStorage.removeItem("barqpix_guest_user");
+            } else {
+              localStorage.removeItem("barqpix_user");
+              setUser(null);
+            }
+          } catch (e) {
+            console.error("Failed to parse stored user data", e);
+            localStorage.removeItem("barqpix_user");
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
       } else {
         const storedGuestUser = localStorage.getItem("barqpix_guest_user");
         if (storedGuestUser) {
@@ -105,12 +125,12 @@ export default function BarqPixApp() {
 
   // Handle delete event
   const handleDeleteEvent = async (eventId: string) => {
-    if (!user?.token) {
+    if (!user) {
       toast.error("You must be logged in to delete events");
       return;
     }
     try {
-      await eventApi.deleteEvent(eventId, user.token);
+      await eventApi.deleteEvent(eventId);
       toast.success("Event deleted successfully");
       setRefreshEvents((c) => c + 1);
     } catch (error) {
@@ -161,7 +181,7 @@ export default function BarqPixApp() {
           />
         );
       case "gallery":
-        return <PhotoGallery userId={user?.id ?? null} />;
+        return <PhotoGallery user={user} />;
       case "create-event":
         return (
           <CreateEvent
@@ -369,6 +389,7 @@ export default function BarqPixApp() {
                 await auth.signOut();
                 localStorage.removeItem("barqpix_guest_user");
                 setUser(null);
+                setCurrentView("home");
               }}
             />
             <main className="container mx-auto px-4 py-8 mt-12">

@@ -14,7 +14,6 @@ import { Input } from "@/app/components/ui/input";
 import { Textarea } from "@/app/components/ui/textarea";
 import { Calendar } from "lucide-react";
 import { toast } from "@/app/components/ui/toast";
-// import { toast } from "sonner";
 import { eventApi } from "@/lib/api/event";
 import { Event } from "@/app/types";
 import { photoApi } from "@/lib/api/photo";
@@ -47,7 +46,7 @@ export default function CreateEvent({
     const savedData = localStorage.getItem("eventFormData");
     if (savedData) {
       const parsed = JSON.parse(savedData);
-      // If there was a saved cover image URL, restore it
+
       if (parsed.coverImageUrl) {
         return {
           ...parsed,
@@ -186,31 +185,20 @@ export default function CreateEvent({
       let eventId;
       if (eventToEdit) {
         // Update existing event
-        const response = await eventApi.updateEvent(
-          eventToEdit.id,
-          { ...eventData, id: eventToEdit.id } as Event,
-          user.token
-        );
+        const response = await eventApi.updateEvent(eventToEdit.id, {
+          ...eventData,
+          id: eventToEdit.id,
+        } as Event);
         eventId = eventToEdit.id;
-        toast.success("Event updated successfully!");
       } else {
         // Create new event
-        const response = await eventApi.createEvent(
-          eventData as Event,
-          user.token
-        );
+        const response = await eventApi.createEvent(eventData as Event);
         eventId = response.id;
-        toast.success("Event created successfully!");
       }
 
       if (formData.coverImage) {
         try {
-          await photoApi.uploadEventCover(
-            eventId,
-            formData.coverImage,
-            user.token
-          );
-          toast.success("Cover image uploaded successfully!");
+          await photoApi.uploadEventCover(eventId, formData.coverImage);
         } catch (error) {
           toast.error("Failed to upload cover image");
           return;
@@ -218,7 +206,13 @@ export default function CreateEvent({
       }
 
       localStorage.removeItem("eventFormData");
-      onViewChange("event-list");
+      toast.success(
+        eventToEdit
+          ? "Event updated successfully!"
+          : "Event created successfully!"
+      );
+      onViewChange("qr-generator");
+      localStorage.setItem("barqpix_current_event", eventId);
     } catch (error: any) {
       toast.error(
         error.message ||

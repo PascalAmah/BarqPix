@@ -4,7 +4,7 @@ export const toast = {
   success: (message: string) => {
     sonnerToast.success(message, {
       style: {
-        background: "hsl(var(--primary-foreground) / 0.1)",
+        background: "hsl(var(--primary-foreground) / 0.2)",
         color: "hsl(var(--primary))",
         border: "1px solid hsl(var(--primary) / 0.2)",
       },

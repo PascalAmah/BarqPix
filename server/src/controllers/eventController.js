@@ -30,7 +30,7 @@ export const eventController = {
         endDate,
         location,
         galleryVisibility: galleryVisibility || "public",
-        coverImage: null, // This Cover image will be set by photo controller
+        coverImage: null,
         organizer: uid,
         createdAt: new Date().toISOString(),
         status: "active",

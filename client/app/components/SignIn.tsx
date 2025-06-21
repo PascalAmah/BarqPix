@@ -21,11 +21,15 @@ import { Separator } from "@/app/components/ui/separator";
 import { Checkbox } from "@/app/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/app/components/ui/alert";
 import { Eye, EyeOff, Mail, Lock, ArrowLeft, AlertCircle } from "lucide-react";
-import { signin, resetPassword } from "../../lib/auth.firebase";
+import {
+  signin,
+  resetPassword,
+  setupTokenRefresh,
+} from "../../lib/auth.firebase";
 import { FirebaseError } from "firebase/app";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { auth } from "../../lib/utils/firebase";
-import { toast } from "sonner";
+import { toast } from "@/app/components/ui/toast";
 import { authApi } from "../../lib/api/auth";
 
 interface SignInProps {
@@ -83,10 +87,8 @@ export default function SignIn({
         token,
       };
 
-      if (rememberMe) {
-        localStorage.setItem("barqpix_user", JSON.stringify(user));
-      }
-
+      localStorage.setItem("barqpix_user", JSON.stringify(user));
+      setupTokenRefresh(firebaseUser);
       onUserSignedIn(user);
       onViewChange("home");
       toast.success("Signed in successfully!");
@@ -161,10 +163,8 @@ export default function SignIn({
         token: idToken,
       };
 
-      if (rememberMe) {
-        localStorage.setItem("barqpix_user", JSON.stringify(user));
-      }
-
+      localStorage.setItem("barqpix_user", JSON.stringify(user));
+      setupTokenRefresh(firebaseUser);
       onUserSignedIn(user);
       onViewChange("home");
       toast.success("Signed in with Google!");
