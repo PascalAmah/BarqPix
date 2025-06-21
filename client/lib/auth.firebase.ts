@@ -29,19 +29,48 @@ const setupTokenRefresh = (user: any) => {
     }
   };
 
-  const expiresIn = 60 * 60 * 1000; // 1 hour in milliseconds
-  tokenRefreshTimeout = setTimeout(refreshToken, expiresIn - 5 * 60 * 1000);
+  const refreshInterval = 30 * 60 * 1000; // 30 minutes in milliseconds
+  tokenRefreshTimeout = setTimeout(refreshToken, refreshInterval);
+
+  refreshToken();
 };
+
+export { setupTokenRefresh };
 
 onAuthStateChanged(auth, (user) => {
   if (user) {
-    setupTokenRefresh(user);
+    const storedUser = localStorage.getItem("barqpix_user");
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        if (userData.id === user.uid) {
+          setupTokenRefresh(user);
+        }
+      } catch (e) {
+        console.error("Failed to parse stored user data for token refresh", e);
+      }
+    }
   } else {
     if (tokenRefreshTimeout) {
       clearTimeout(tokenRefreshTimeout);
     }
+    localStorage.removeItem("barqpix_user");
   }
 });
+
+export const forceTokenRefresh = async () => {
+  const user = auth.currentUser;
+  if (!user) throw new Error("No authenticated user");
+
+  const newToken = await user.getIdToken(true);
+  const storedUser = localStorage.getItem("barqpix_user");
+  if (storedUser) {
+    const userData = JSON.parse(storedUser);
+    userData.token = newToken;
+    localStorage.setItem("barqpix_user", JSON.stringify(userData));
+  }
+  return newToken;
+};
 
 export const signup = async (
   email: string,

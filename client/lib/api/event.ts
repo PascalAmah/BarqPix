@@ -1,100 +1,115 @@
 import { Event } from "@/app/types";
+import { forceTokenRefresh } from "../auth.firebase";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
+const getToken = async () => {
+  try {
+    const storedUser = localStorage.getItem("barqpix_user");
+    if (!storedUser) throw new Error("No authenticated user");
+    const userData = JSON.parse(storedUser);
+    return userData.token;
+  } catch (error) {
+    return await forceTokenRefresh();
+  }
+};
+
 export const eventApi = {
-  async createEvent(event: Event, token: string) {
+  async createEvent(eventData: Partial<Event>) {
+    const token = await getToken();
     const response = await fetch(`${API_URL}/api/events`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(event),
+      body: JSON.stringify(eventData),
     });
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to create event");
+      throw new Error("Failed to create event");
     }
+
     return response.json();
   },
 
-  async getEvents(token: string) {
+  async getUserEvents() {
+    const token = await getToken();
     const response = await fetch(`${API_URL}/api/events`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
+
     if (!response.ok) {
-      throw new Error("Failed to get events");
+      throw new Error("Failed to fetch events");
     }
+
     return response.json();
   },
 
-  async getEvent(id: string, token: string) {
-    const response = await fetch(`${API_URL}/api/events/${id}`, {
+  async getEvent(eventId: string) {
+    const token = await getToken();
+    const response = await fetch(`${API_URL}/api/events/${eventId}`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
+
     if (!response.ok) {
-      throw new Error("Failed to get event");
+      throw new Error("Failed to fetch event");
     }
+
     return response.json();
   },
 
-  async getUserEvents(token: string) {
-    const response = await fetch(`${API_URL}/api/events`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    if (!response.ok) {
-      throw new Error("Failed to get user events");
-    }
-    return response.json();
-  },
-
-  async updateEvent(id: string, event: Event, token: string) {
-    const response = await fetch(`${API_URL}/api/events/${id}`, {
+  async updateEvent(eventId: string, eventData: Partial<Event>) {
+    const token = await getToken();
+    const response = await fetch(`${API_URL}/api/events/${eventId}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(event),
+      body: JSON.stringify(eventData),
     });
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Failed to update event");
+      throw new Error("Failed to update event");
     }
+
     return response.json();
   },
 
-  async deleteEvent(id: string, token: string) {
-    const response = await fetch(`${API_URL}/api/events/${id}`, {
+  async deleteEvent(eventId: string) {
+    const token = await getToken();
+    const response = await fetch(`${API_URL}/api/events/${eventId}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
+
     if (!response.ok) {
       throw new Error("Failed to delete event");
     }
+
     return response.json();
   },
 
-  async joinEvent(id: string, token: string) {
-    const response = await fetch(`${API_URL}/api/events/${id}/join`, {
+  async joinEvent(eventId: string) {
+    const token = await getToken();
+    const response = await fetch(`${API_URL}/api/events/${eventId}/join`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
     });
+
     if (!response.ok) {
       throw new Error("Failed to join event");
     }
+
     return response.json();
   },
 };

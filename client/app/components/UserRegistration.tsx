@@ -33,7 +33,7 @@ import { signup } from "../../lib/auth.firebase";
 import { FirebaseError } from "firebase/app";
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { auth } from "../../lib/utils/firebase";
-import { toast } from "sonner";
+import { toast } from "@/app/components/ui/toast";
 import { authApi } from "../../lib/api/auth";
 
 interface UserRegistrationProps {
@@ -119,7 +119,7 @@ export default function UserRegistration({
     onUserCreated(guestUser);
     localStorage.setItem("barqpix_guest_user", JSON.stringify(guestUser));
     onViewChange("home");
-    toast.info("Continuing as guest.");
+    toast.success("Continuing as guest.");
   };
 
   const handleGoogleSignUp = async () => {
@@ -170,7 +170,7 @@ export default function UserRegistration({
           <div>
             <CardTitle className="flex items-center justify-center gap-2">
               <UserPlus className="w-6 h-6" />
-              Join Event
+              Create Account
             </CardTitle>
             <CardDescription>
               Create an account or continue as guest
