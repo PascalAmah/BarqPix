@@ -5,6 +5,8 @@ import { validateEvent } from "../middlewares/validationMiddleware.js";
 
 const router = Router();
 
+router.get("/public/:eventId", eventController.getPublicEvent);
+
 // Protected routes
 router.post("/", verifyToken, validateEvent, eventController.createEvent);
 

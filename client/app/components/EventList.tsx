@@ -36,7 +36,7 @@ const EventList: React.FC<EventListProps> = ({
     const fetchEvents = async () => {
       setLoading(true);
       try {
-        const { events } = await eventApi.getUserEvents(user.token);
+        const { events } = await eventApi.getUserEvents();
         setEvents(events);
       } catch (error) {
         toast.error("Failed to fetch events");

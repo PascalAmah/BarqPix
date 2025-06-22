@@ -30,7 +30,7 @@ export const eventController = {
         endDate,
         location,
         galleryVisibility: galleryVisibility || "public",
-        coverImage: null, // This Cover image will be set by photo controller
+        coverImage: null,
         organizer: uid,
         createdAt: new Date().toISOString(),
         status: "active",
@@ -84,6 +84,42 @@ export const eventController = {
       });
     } catch (error) {
       console.error("Error getting event:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  // Public endpoint for QR code access - no authentication required
+  async getPublicEvent(req, res) {
+    try {
+      const { eventId } = req.params;
+      const eventDoc = await db.collection("events").doc(eventId).get();
+
+      if (!eventDoc.exists) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      const event = eventDoc.data();
+
+      // Only return active events for public access
+      if (event.status !== "active") {
+        return res.status(404).json({ error: "Event not found" });
+      }
+
+      // Don't return photos for public access - just event details
+      res.json({
+        event: {
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          startDate: event.startDate,
+          endDate: event.endDate,
+          location: event.location,
+          galleryVisibility: event.galleryVisibility,
+          organizer: event.organizer,
+        },
+      });
+    } catch (error) {
+      console.error("Error getting public event:", error);
       res.status(500).json({ error: error.message });
     }
   },
