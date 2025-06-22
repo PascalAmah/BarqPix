@@ -16,6 +16,8 @@ import {
   Plus,
   Users,
   User as UserIcon,
+  Trash2,
+  BarChart3,
 } from "lucide-react";
 import {
   Select,
@@ -25,8 +27,11 @@ import {
   SelectValue,
 } from "@/app/components/ui/select";
 import { Input } from "@/app/components/ui/input";
-import { toast } from "sonner";
+import { toast } from "../components/ui/toast";
 import type { User as UserType, Event } from "../types";
+import { eventApi } from "@/lib/api/event";
+import { qrApi } from "@/lib/api/qr";
+
 type User = UserType;
 
 interface QRCodeGeneratorProps {
@@ -34,107 +39,128 @@ interface QRCodeGeneratorProps {
   onViewChange: (view: string) => void;
 }
 
+interface QRCodeData {
+  id: string;
+  eventId?: string;
+  userId: string;
+  type: "event" | "quick";
+  title: string;
+  url: string;
+  qrCodeData: string;
+  scanCount: number;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt?: string;
+}
+
 export default function QRCodeGenerator({
   user,
   onViewChange,
 }: QRCodeGeneratorProps) {
-  const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
-  const [selectedEvent, setSelectedEvent] = useState<string>("quick");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<string>("");
   const [userEvents, setUserEvents] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [userQRCodes, setUserQRCodes] = useState<QRCodeData[]>([]);
+  const [currentQRCode, setCurrentQRCode] = useState<QRCodeData | null>(null);
   const [quickTitle, setQuickTitle] = useState<string>("");
   const [previewPhotos, setPreviewPhotos] = useState<string[]>([]);
+  const [showStats, setShowStats] = useState(false);
+  const [qrStats, setQrStats] = useState<any>(null);
+
+  const handleEventChange = (value: string) => {
+    setSelectedEvent(value);
+    setCurrentQRCode(null);
+    setShowStats(false);
+  };
 
   useEffect(() => {
-    const loadEvents = async () => {
-      if (user && !user.isGuest) {
-        try {
-          // Simulate API call
-          const mockEvents: Event[] = [
-            {
-              id: "1",
-              title: "Summer Wedding 2025",
-              startDate: "2025-06-15T14:00",
-              endDate: "2025-06-15T23:00",
-              organizerId: user.id,
-            },
-          ];
-          setUserEvents(mockEvents);
-        } catch (error) {
-          toast.error("Failed to load events");
-        }
-      } else {
-        setUserEvents([]);
+    const loadData = async () => {
+      if (!user || user.isGuest) {
+        setIsLoading(false);
+        return;
       }
-      setLoading(false);
+
+      try {
+        const { events } = await eventApi.getUserEvents();
+        setUserEvents(events);
+
+        const { qrCodes } = await qrApi.getUserQRCodes();
+        setUserQRCodes(qrCodes);
+
+        const newEventId = localStorage.getItem("barqpix_current_event");
+        if (newEventId) {
+          handleEventChange(newEventId);
+          localStorage.removeItem("barqpix_current_event");
+        }
+      } catch (error) {
+        console.error("Failed to load data:", error);
+        toast.error("Failed to load events and QR codes");
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    loadEvents();
+    loadData();
   }, [user]);
 
   const generateQRCode = async () => {
+    if ((!user || user.isGuest) && !quickTitle.trim()) {
+      toast.error("Please enter a title for your QR code");
+      return;
+    }
+
+    if (user && !user.isGuest && !selectedEvent) {
+      toast.error("Please select an event or choose quick share");
+      return;
+    }
+
+    setIsGenerating(true);
     try {
-      setLoading(true);
+      let response;
 
-      // Input validation
-      if (!selectedEvent) {
-        throw new Error("Please select an event or choose quick share");
-      }
-
-      if (
-        (selectedEvent === "quick" || !user || user.isGuest) &&
-        !quickTitle.trim()
-      ) {
-        throw new Error("Please enter a title for your QR code");
-      }
-
-      let qrData: string;
       if (!user || user.isGuest || selectedEvent === "quick") {
-        qrData = `BarqPix Quick Share - ${quickTitle.trim()}`;
+        if (!user || user.isGuest) {
+          response = await qrApi.generateGuestQuickQR(quickTitle.trim());
+        } else {
+          response = await qrApi.generateQuickQR(quickTitle.trim());
+        }
       } else {
-        const event = userEvents.find((e) => e.id === selectedEvent);
-        if (!event) throw new Error("Selected event not found");
-        qrData = `BarqPix Event - ${event.title}`;
+        response = await qrApi.generateEventQR(selectedEvent);
       }
 
-      const mockQrCode = `https://api.qrserver.com/v1/create-qr-code/?size=456x456&data=${encodeURIComponent(
-        qrData
-      )}`;
-      setQrCodeUrl(mockQrCode);
+      setCurrentQRCode(response.qrCode);
 
-      // mock preview photos
-      const mockPhotos = [
-        "/placeholder.svg?height=300&width=300",
-        "/placeholder.svg?height=300&width=300",
-        "/placeholder.svg?height=300&width=300",
-      ];
-      setPreviewPhotos(mockPhotos);
+      if (user && !user.isGuest) {
+        const { qrCodes } = await qrApi.getUserQRCodes();
+        setUserQRCodes(qrCodes);
+      }
 
       toast.success("QR Code generated successfully!");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to generate QR code"
-      );
-      setQrCodeUrl("");
+    } catch (error: any) {
+      console.error("Failed to generate QR code:", error);
+      toast.error(error.message || "Failed to generate QR code");
     } finally {
-      setLoading(false);
+      setIsGenerating(false);
     }
   };
 
   const handleDownload = async () => {
     try {
-      if (!qrCodeUrl) throw new Error("No QR code generated");
+      if (!currentQRCode) throw new Error("No QR code generated");
 
-      const response = await fetch(qrCodeUrl);
+      const response = await fetch(currentQRCode.qrCodeData);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `barqpix-qr-${quickTitle || "event"}.png`;
+      link.download = `barqpix-qr-${currentQRCode.title || "event"}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
+
+      toast.success("QR Code downloaded successfully!");
     } catch (error) {
       toast.error("Failed to download QR code");
     }
@@ -142,12 +168,63 @@ export default function QRCodeGenerator({
 
   const handleShare = async () => {
     try {
-      await navigator.clipboard.writeText(qrCodeUrl);
+      if (!currentQRCode) throw new Error("No QR code generated");
+      await navigator.clipboard.writeText(currentQRCode.url);
       toast.success("QR Code URL copied to clipboard!");
     } catch (error) {
       toast.error("Failed to copy QR code URL");
     }
   };
+
+  const handleDeleteQRCode = async (qrCodeId: string) => {
+    try {
+      await qrApi.deleteQRCode(qrCodeId);
+
+      if (user && !user.isGuest) {
+        const { qrCodes } = await qrApi.getUserQRCodes();
+        setUserQRCodes(qrCodes);
+      }
+
+      if (currentQRCode?.id === qrCodeId) {
+        setCurrentQRCode(null);
+        setShowStats(false);
+      }
+
+      toast.success("QR Code deleted successfully!");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete QR code");
+    }
+  };
+
+  const handleViewStats = async (qrCodeId: string) => {
+    try {
+      const response = await qrApi.getQRCodeStats(qrCodeId);
+      setQrStats(response.stats);
+      setShowStats(true);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load QR code statistics");
+    }
+  };
+
+  const loadExistingQRCode = async (qrCodeId: string) => {
+    try {
+      const response = await qrApi.getQRCode(qrCodeId);
+      setCurrentQRCode(response.qrCode);
+      setShowStats(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load QR code");
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="max-w-md mx-auto">
+        <CardContent className="text-center py-8">
+          <p>Loading events...</p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="w-full max-w-2xl mx-auto">
@@ -205,7 +282,7 @@ export default function QRCodeGenerator({
                 </Button>
                 <Button
                   onClick={generateQRCode}
-                  disabled={loading || !quickTitle.trim()}
+                  disabled={isGenerating || !quickTitle.trim()}
                   className="w-full sm:w-auto"
                 >
                   <QrCode className="w-4 h-4 mr-2" />
@@ -217,7 +294,7 @@ export default function QRCodeGenerator({
             <>
               <div className="space-y-3">
                 <label className="text-sm font-medium">Select Event</label>
-                <Select value={selectedEvent} onValueChange={setSelectedEvent}>
+                <Select value={selectedEvent} onValueChange={handleEventChange}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Choose an event" />
                   </SelectTrigger>
@@ -273,7 +350,7 @@ export default function QRCodeGenerator({
                 <Button
                   onClick={generateQRCode}
                   disabled={
-                    loading ||
+                    isGenerating ||
                     !selectedEvent ||
                     (selectedEvent === "quick" && !quickTitle.trim())
                   }
@@ -286,24 +363,47 @@ export default function QRCodeGenerator({
             </>
           )}
 
-          {qrCodeUrl && (
+          {currentQRCode && (
             <div className="mt-6 space-y-6">
+              {/* QR Code Display */}
               <div className="flex justify-center">
                 <div className="relative w-full max-w-[256px] aspect-square">
                   <img
-                    src={qrCodeUrl}
+                    src={currentQRCode.qrCodeData}
                     alt="Generated QR Code"
                     className="w-full h-full object-contain"
                   />
                 </div>
               </div>
 
+              {/* QR Code Info */}
+              <div className="text-center space-y-2">
+                <h3 className="font-medium text-lg">{currentQRCode.title}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {currentQRCode.type === "event"
+                    ? "Event QR Code"
+                    : "Quick Share Code"}
+                </p>
+                {currentQRCode.scanCount > 0 && (
+                  <p className="text-sm text-green-600">
+                    {currentQRCode.scanCount} scan
+                    {currentQRCode.scanCount !== 1 ? "s" : ""}
+                  </p>
+                )}
+                {currentQRCode.expiresAt && (
+                  <p className="text-sm text-amber-600">
+                    Expires:{" "}
+                    {new Date(currentQRCode.expiresAt).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+
+              {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <Button
                   variant="outline"
                   onClick={handleDownload}
                   className="w-full sm:w-auto"
-                  disabled={!qrCodeUrl}
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Download QR Code
@@ -312,74 +412,133 @@ export default function QRCodeGenerator({
                   variant="outline"
                   onClick={handleShare}
                   className="w-full sm:w-auto"
-                  disabled={!qrCodeUrl}
                 >
                   <Share className="w-4 h-4 mr-2" />
-                  Share Link
+                  Copy Link
                 </Button>
+                {user && !user.isGuest && (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleViewStats(currentQRCode.id)}
+                      className="w-full sm:w-auto"
+                    >
+                      <BarChart3 className="w-4 h-4 mr-2" />
+                      View Stats
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => handleDeleteQRCode(currentQRCode.id)}
+                      className="w-full sm:w-auto text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </Button>
+                  </>
+                )}
               </div>
 
-              {/* Preview Section for Guests */}
-              {(!user || user.isGuest) && (
-                <div className="space-y-4">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-medium text-blue-700 mb-2">
-                      How it works:
-                    </h4>
-                    <ol className="list-decimal list-inside space-y-2 text-sm text-blue-700">
-                      <li>Share this QR code with event guests</li>
-                      <li>Guests scan and take photos</li>
-                      <li>Photos appear here instantly</li>
-                      <li>Preview photos for 24 hours</li>
-                    </ol>
-                  </div>
-
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">Example Preview:</h3>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                      {previewPhotos.map((photo, index) => (
-                        <div
-                          key={index}
-                          className="relative aspect-square rounded-lg overflow-hidden bg-muted group"
-                        >
-                          <img
-                            src={photo}
-                            alt={`Preview ${index + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                          {/* Add 24h indicator */}
-                          <div className="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full">
-                            24h
-                          </div>
-                          {/* Add preview overlay */}
-                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <p className="text-white text-sm">
-                              Available for 24 hours
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+              {/* Statistics Display */}
+              {showStats && qrStats && (
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="font-medium mb-3">QR Code Statistics</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Total Scans</p>
+                      <p className="font-medium">{qrStats.totalScans}</p>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Want to keep your photos forever?{" "}
-                      <Button
-                        variant="link"
-                        className="p-0 h-auto text-primary"
-                        onClick={() => onViewChange("register")}
-                      >
-                        Sign up for a full account
-                      </Button>
-                    </p>
+                    <div>
+                      <p className="text-muted-foreground">Unique Scanners</p>
+                      <p className="font-medium">{qrStats.uniqueScanners}</p>
+                    </div>
                   </div>
+                  {qrStats.recentScans && qrStats.recentScans.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-muted-foreground mb-2">Recent Scans</p>
+                      <div className="space-y-1">
+                        {qrStats.recentScans
+                          .slice(0, 5)
+                          .map((scan: any, index: number) => (
+                            <div
+                              key={index}
+                              className="flex justify-between text-xs"
+                            >
+                              <span>{scan.scannerName || "Anonymous"}</span>
+                              <span>
+                                {new Date(scan.scannedAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
 
-          {loading && (
+          {/* QR Code History for Registered Users */}
+          {user && !user.isGuest && userQRCodes.length > 0 && (
+            <div className="mt-8 space-y-4">
+              <h3 className="font-medium text-lg">Your QR Codes</h3>
+              <div className="grid gap-4">
+                {userQRCodes.map((qrCode) => (
+                  <div
+                    key={qrCode.id}
+                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className="w-12 h-12">
+                        <img
+                          src={qrCode.qrCodeData}
+                          alt={qrCode.title}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                      <div>
+                        <h4 className="font-medium">{qrCode.title}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          {qrCode.type === "event"
+                            ? "Event QR Code"
+                            : "Quick Share Code"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Created:{" "}
+                          {new Date(qrCode.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-green-600">
+                        {qrCode.scanCount} scan
+                        {qrCode.scanCount !== 1 ? "s" : ""}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => loadExistingQRCode(qrCode.id)}
+                      >
+                        View
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteQRCode(qrCode.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isGenerating && (
             <div className="absolute inset-0 bg-white/50 flex items-center justify-center z-50">
               <div className="flex flex-col items-center gap-2">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 <p className="text-sm text-muted-foreground">
                   Generating QR Code...
                 </p>

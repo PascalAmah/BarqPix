@@ -1,4 +1,4 @@
-import { db, auth } from "../config/firebase.js";
+import { db } from "../config/firebase.js";
 
 export const authController = {
   async createUser(req, res) {
@@ -58,7 +58,6 @@ export const authController = {
       const { uid } = req.user;
       const updates = req.body;
 
-      // Remove sensitive fields
       delete updates.email;
       delete updates.role;
       delete updates.createdAt;

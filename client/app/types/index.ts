@@ -15,7 +15,6 @@ export interface Event {
   startDate: string;
   endDate: string;
   coverImage?: string;
-  organizerId?: string;
   location: string;
   galleryVisibility: "public" | "private";
 }
