@@ -112,4 +112,14 @@ export const eventApi = {
 
     return response.json();
   },
+
+  async getPublicEvent(eventId: string) {
+    const response = await fetch(`${API_URL}/api/events/public/${eventId}`);
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch public event data");
+    }
+
+    return response.json();
+  },
 };

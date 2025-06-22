@@ -5,6 +5,7 @@ import { createServer } from "http";
 import authRoutes from "./routes/authRoutes.js";
 import eventRoutes from "./routes/eventRoutes.js";
 import photoRoutes from "./routes/photoRoutes.js";
+import qrRoutes from "./routes/qrRoutes.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import * as dotenv from "dotenv";
 
@@ -42,23 +43,11 @@ wss.on("connection", (ws, req) => {
   }
 });
 
-// Broadcast updates to all connected clients for an event
-export const broadcastToEvent = (eventId, data) => {
-  const eventConnections = connections.get(eventId);
-  if (eventConnections) {
-    const message = JSON.stringify(data);
-    eventConnections.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(message);
-      }
-    });
-  }
-};
-
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/events", eventRoutes);
 app.use("/api/photos", photoRoutes);
+app.use("/api/qr", qrRoutes);
 
 // Error handling
 app.use(errorHandler);

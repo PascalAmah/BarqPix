@@ -36,6 +36,8 @@ export default function BarqPixApp() {
   });
   const [user, setUser] = useState<User | null>(null);
   const [scannedUserId, setScannedUserId] = useState<string | null>(null);
+  const [currentEventId, setCurrentEventId] = useState<string | null>(null);
+  const [eventDetails, setEventDetails] = useState<any>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [editEvent, setEditEvent] = useState<EventType | null>(null);
   const [refreshEvents, setRefreshEvents] = useState(0);
@@ -170,18 +172,20 @@ export default function BarqPixApp() {
           />
         );
       case "upload":
-        if (!scannedUserId && (!user || user.isGuest)) {
+        if (!user && !scannedUserId) {
           setCurrentView("scanner");
           return null;
         }
         return (
           <PhotoUpload
             userId={(scannedUserId || user?.id) ?? null}
+            eventId={currentEventId}
+            eventDetails={eventDetails}
             onViewChange={setCurrentView}
           />
         );
       case "gallery":
-        return <PhotoGallery user={user} />;
+        return <PhotoGallery user={user} eventId={currentEventId} />;
       case "create-event":
         return (
           <CreateEvent
