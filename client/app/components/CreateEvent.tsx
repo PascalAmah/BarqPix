@@ -22,6 +22,7 @@ interface CreateEventProps {
   user: any;
   onViewChange: (view: string) => void;
   eventToEdit?: Event | null;
+  previousView: string;
 }
 
 interface EventFormData {
@@ -40,6 +41,7 @@ export default function CreateEvent({
   user,
   onViewChange,
   eventToEdit,
+  previousView,
 }: CreateEventProps) {
   const [loading, setLoading] = React.useState(false);
   const [formData, setFormData] = React.useState<EventFormData>(() => {
@@ -184,7 +186,6 @@ export default function CreateEvent({
 
       let eventId;
       if (eventToEdit) {
-        // Update existing event
         const response = await eventApi.updateEvent(eventToEdit.id, {
           ...eventData,
           id: eventToEdit.id,
@@ -235,7 +236,6 @@ export default function CreateEvent({
         [name]: value,
       };
 
-      // If start date changes and end date is before it, update end date
       if (
         name === "startDate" &&
         newData.endDate &&
@@ -260,7 +260,8 @@ export default function CreateEvent({
       coverImage: null,
       coverImagePreview: undefined,
     });
-    onViewChange(eventToEdit ? "event-list" : "home");
+
+    onViewChange(previousView);
   };
 
   if (!user) {
