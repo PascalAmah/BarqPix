@@ -300,4 +300,40 @@ export const eventController = {
       res.status(500).json({ error: error.message });
     }
   },
+
+  async searchEvents(req, res) {
+    try {
+      const { title } = req.query;
+
+      if (!title || !title.trim()) {
+        return res.status(400).json({ error: "Title parameter is required" });
+      }
+
+      const eventsSnapshot = await db
+        .collection("events")
+        .where("status", "==", "active")
+        .get();
+
+      const events = eventsSnapshot.docs
+        .map((doc) => doc.data())
+        .filter((event) =>
+          event.title.toLowerCase().includes(title.toLowerCase().trim())
+        )
+        .slice(0, 5);
+
+      res.json({
+        events: events.map((event) => ({
+          id: event.id,
+          title: event.title,
+          description: event.description,
+          startDate: event.startDate,
+          endDate: event.endDate,
+          location: event.location,
+        })),
+      });
+    } catch (error) {
+      console.error("Error searching events:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
 };
