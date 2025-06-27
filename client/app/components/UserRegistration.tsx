@@ -202,7 +202,7 @@ export default function UserRegistration({
             />
           </div>
           <div>
-            <CardTitle className="flex items-center justify-center gap-2">
+            <CardTitle className="flex text-xl items-center justify-center gap-2">
               <UserPlus className="w-6 h-6" />
               Create Account
             </CardTitle>

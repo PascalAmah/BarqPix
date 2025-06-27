@@ -22,7 +22,6 @@ import {
 import { toast } from "@/app/components/ui/toast";
 import { eventApi } from "@/lib/api/event";
 
-// Dynamically import to avoid SSR issues
 const QrReader = dynamic(
   () => import("react-qr-reader").then((mod) => ({ default: mod.QrReader })),
   { ssr: false }
