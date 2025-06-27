@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../lib/utils/firebase";
 
 import {
@@ -16,7 +16,7 @@ import { Camera, QrCode, Users, ImageIcon, CalendarPlus } from "lucide-react";
 import type { User, Event as EventType } from "./types";
 import UserRegistration from "./components/UserRegistration";
 import QRCodeGenerator from "./components/QRCodeGenerator";
-import BarcodeScanner from "./components/BarcodeScanner";
+import QRCodeScanner from "./components/QRCodeScanner";
 import PhotoUpload from "./components/PhotoUpload";
 import PhotoGallery from "./components/PhotoGallery";
 import Navigation from "./components/Navigation";
@@ -26,31 +26,115 @@ import SignIn from "./components/SignIn";
 import { toast } from "./components/ui/toast";
 import EventList from "./components/EventList";
 import { eventApi } from "@/lib/api/event";
+import QuickShareViewer from "./components/QuickShareViewer";
+import { authApi } from "@/lib/api/auth";
 
 export default function BarqPixApp() {
-  const [currentView, setCurrentView] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("barqpix_current_view") || "home";
-    }
-    return "home";
-  });
+  const [currentView, setCurrentView] = useState<string>("home");
   const [user, setUser] = useState<User | null>(null);
-  const [scannedUserId, setScannedUserId] = useState<string | null>(null);
+  const [scannedUrl, setScannedUrl] = useState<string | null>(null);
   const [currentEventId, setCurrentEventId] = useState<string | null>(null);
   const [eventDetails, setEventDetails] = useState<any>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [editEvent, setEditEvent] = useState<EventType | null>(null);
   const [refreshEvents, setRefreshEvents] = useState(0);
+  const [previousView, setPreviousView] = useState("home");
+
+  const handleNavigate = (view: string) => {
+    if (!user || user.isGuest) {
+      switch (view) {
+        case "create-event":
+        case "gallery":
+          setCurrentView("register");
+          return;
+        default:
+          setPreviousView(currentView);
+          setCurrentView(view);
+      }
+    } else {
+      setPreviousView(currentView);
+      setCurrentView(view);
+    }
+  };
+
+  const navigateToCreateEvent = () => {
+    setPreviousView(currentView);
+    setCurrentView("create-event");
+  };
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedView = localStorage.getItem("barqpix_current_view");
+      if (storedView) {
+        setCurrentView(storedView);
+      } else {
+        setCurrentView("home");
+        localStorage.setItem("barqpix_current_view", "home");
+      }
+    }
+  }, []);
 
   // Firebase Auth State Listener for Persistence & Guest Mode Persistence
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const storedUser = localStorage.getItem("barqpix_user");
-        if (storedUser) {
+        try {
+          const token = await firebaseUser.getIdToken();
           try {
-            const userData = JSON.parse(storedUser);
-            if (userData.id === firebaseUser.uid) {
+            await authApi.getCurrentUser(token);
+          } catch (error) {
+            console.log("User not found in database, attempting to create...");
+            try {
+              await authApi.createUser(firebaseUser);
+            } catch (createError) {
+              console.error("Failed to create user in database:", createError);
+              await signOut(auth);
+              localStorage.removeItem("barqpix_user");
+              setUser(null);
+              toast.error("Failed to create user account. Please try again.");
+              setLoadingUser(false);
+              return;
+            }
+          }
+
+          const storedUser = localStorage.getItem("barqpix_user");
+          if (storedUser) {
+            try {
+              const userData = JSON.parse(storedUser);
+              if (userData.id === firebaseUser.uid) {
+                const appUser: User = {
+                  id: firebaseUser.uid,
+                  email: firebaseUser.email || "",
+                  name:
+                    firebaseUser.displayName ||
+                    firebaseUser.email?.split("@")[0] ||
+                    "",
+                  isGuest: false,
+                  createdAt:
+                    firebaseUser.metadata.creationTime ||
+                    new Date().toISOString(),
+                };
+                setUser(appUser);
+                localStorage.removeItem("barqpix_guest_user");
+              } else {
+                const appUser: User = {
+                  id: firebaseUser.uid,
+                  email: firebaseUser.email || "",
+                  name:
+                    firebaseUser.displayName ||
+                    firebaseUser.email?.split("@")[0] ||
+                    "",
+                  isGuest: false,
+                  createdAt:
+                    firebaseUser.metadata.creationTime ||
+                    new Date().toISOString(),
+                };
+                setUser(appUser);
+                localStorage.setItem("barqpix_user", JSON.stringify(appUser));
+                localStorage.removeItem("barqpix_guest_user");
+              }
+            } catch (e) {
+              console.error("Failed to parse stored user data", e);
               const appUser: User = {
                 id: firebaseUser.uid,
                 email: firebaseUser.email || "",
@@ -64,18 +148,31 @@ export default function BarqPixApp() {
                   new Date().toISOString(),
               };
               setUser(appUser);
+              localStorage.setItem("barqpix_user", JSON.stringify(appUser));
               localStorage.removeItem("barqpix_guest_user");
-            } else {
-              localStorage.removeItem("barqpix_user");
-              setUser(null);
             }
-          } catch (e) {
-            console.error("Failed to parse stored user data", e);
-            localStorage.removeItem("barqpix_user");
-            setUser(null);
+          } else {
+            const appUser: User = {
+              id: firebaseUser.uid,
+              email: firebaseUser.email || "",
+              name:
+                firebaseUser.displayName ||
+                firebaseUser.email?.split("@")[0] ||
+                "",
+              isGuest: false,
+              createdAt:
+                firebaseUser.metadata.creationTime || new Date().toISOString(),
+            };
+            setUser(appUser);
+            localStorage.setItem("barqpix_user", JSON.stringify(appUser));
+            localStorage.removeItem("barqpix_guest_user");
           }
-        } else {
+        } catch (error) {
+          console.error("Error in auth state listener:", error);
+          await signOut(auth);
+          localStorage.removeItem("barqpix_user");
           setUser(null);
+          toast.error("Authentication error. Please try again.");
         }
       } else {
         const storedGuestUser = localStorage.getItem("barqpix_guest_user");
@@ -98,34 +195,35 @@ export default function BarqPixApp() {
     return () => unsubscribe();
   }, []);
 
-  const handleNavigate = (view: string) => {
-    if (!user || user.isGuest) {
-      switch (view) {
-        case "create-event":
-        case "gallery":
-          setCurrentView("register");
-          return;
-        default:
-          setCurrentView(view);
-      }
-    } else {
-      setCurrentView(view);
-    }
-  };
-
-  // Scroll to top when view changes
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
     localStorage.setItem("barqpix_current_view", currentView);
   }, [currentView]);
 
-  // Handle edit event
+  useEffect(() => {
+    const fetchEventDetails = async () => {
+      if (currentEventId) {
+        try {
+          const data = await eventApi.getPublicEvent(currentEventId);
+          setEventDetails(data.event);
+        } catch (error) {
+          console.error("Failed to fetch event details:", error);
+          setEventDetails(null);
+        }
+      } else {
+        setEventDetails(null);
+      }
+    };
+
+    fetchEventDetails();
+  }, [currentEventId]);
+
   const handleEditEvent = (event: EventType) => {
     setEditEvent(event);
+    setPreviousView(currentView);
     setCurrentView("create-event");
   };
 
-  // Handle delete event
   const handleDeleteEvent = async (eventId: string) => {
     if (!user) {
       toast.error("You must be logged in to delete events");
@@ -163,35 +261,76 @@ export default function BarqPixApp() {
           />
         );
       case "qr-generator":
-        return <QRCodeGenerator user={user} onViewChange={setCurrentView} />;
+        return (
+          <QRCodeGenerator
+            user={user}
+            onViewChange={setCurrentView}
+            onCreateEvent={navigateToCreateEvent}
+          />
+        );
       case "scanner":
         return (
-          <BarcodeScanner
-            onScanComplete={setScannedUserId}
+          <QRCodeScanner
+            onScanComplete={(scannedData) => {
+              setScannedUrl(scannedData);
+              try {
+                const url = new URL(scannedData);
+                if (url.pathname.startsWith("/quick/")) {
+                  const quickId = url.pathname.split("/")[2];
+                  setCurrentEventId(`quick_${quickId}`);
+                  if (!user || user.isGuest) {
+                    setCurrentView("quick-share");
+                  } else {
+                    setCurrentView("upload");
+                  }
+                } else if (url.pathname.startsWith("/upload/")) {
+                  const eventId = url.pathname.split("/")[2];
+                  setCurrentEventId(eventId);
+                  setCurrentView("upload");
+                }
+              } catch (error) {
+                console.error("Failed to parse scanned URL:", error);
+              }
+            }}
             onViewChange={setCurrentView}
           />
         );
       case "upload":
-        if (!user && !scannedUserId) {
+        if (!user && !scannedUrl) {
           setCurrentView("scanner");
           return null;
         }
         return (
           <PhotoUpload
-            userId={(scannedUserId || user?.id) ?? null}
+            userId={user?.id ?? null}
+            user={user}
             eventId={currentEventId}
             eventDetails={eventDetails}
             onViewChange={setCurrentView}
           />
         );
       case "gallery":
-        return <PhotoGallery user={user} eventId={currentEventId} />;
+        return (
+          <PhotoGallery
+            user={user}
+            eventId={currentEventId}
+            onViewChange={setCurrentView}
+          />
+        );
+      case "quick-share":
+        return (
+          <QuickShareViewer
+            quickId={currentEventId?.replace("quick_", "") || ""}
+            onViewChange={setCurrentView}
+          />
+        );
       case "create-event":
         return (
           <CreateEvent
             user={user}
             onViewChange={handleViewChange}
             eventToEdit={editEvent}
+            previousView={previousView}
           />
         );
       case "event-list":
@@ -201,6 +340,7 @@ export default function BarqPixApp() {
             onEdit={handleEditEvent}
             onDelete={handleDeleteEvent}
             onViewChange={handleViewChange}
+            onCreateEvent={navigateToCreateEvent}
             refreshEvents={refreshEvents}
           />
         );
@@ -237,10 +377,7 @@ export default function BarqPixApp() {
                 <CardContent className="flex flex-wrap gap-4">
                   {!user.isGuest ? (
                     <>
-                      <Button
-                        onClick={() => handleNavigate("create-event")}
-                        variant="outline"
-                      >
+                      <Button onClick={navigateToCreateEvent} variant="outline">
                         <CalendarPlus className="w-4 h-4 mr-2" />
                         Create Event
                       </Button>
@@ -293,7 +430,7 @@ export default function BarqPixApp() {
               {user && !user.isGuest ? (
                 <Card
                   className="cursor-pointer group relative transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(119,84,246,0.15)] before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-br before:from-purple-100/50 before:to-transparent before:opacity-0 hover:before:opacity-100 before:transition-opacity"
-                  onClick={() => handleNavigate("create-event")}
+                  onClick={navigateToCreateEvent}
                 >
                   <CardHeader className="text-center relative">
                     <CalendarPlus className="w-12 h-12 mx-auto text-purple-600 transition-transform duration-300 group-hover:scale-110" />
@@ -390,10 +527,15 @@ export default function BarqPixApp() {
               onViewChange={setCurrentView}
               user={user}
               onLogout={async () => {
-                await auth.signOut();
+                await signOut(auth);
                 localStorage.removeItem("barqpix_guest_user");
+                localStorage.removeItem("barqpix_user");
+                localStorage.removeItem("barqpix_current_view");
                 setUser(null);
                 setCurrentView("home");
+                setScannedUrl(null);
+                setCurrentEventId(null);
+                setEventDetails(null);
               }}
             />
             <main className="container mx-auto px-4 py-8 mt-12">
