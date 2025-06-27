@@ -1,15 +1,19 @@
-import { forceTokenRefresh } from "../auth.firebase";
+import { auth } from "../utils/firebase";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 const getToken = async () => {
   try {
-    const storedUser = localStorage.getItem("barqpix_user");
-    if (!storedUser) throw new Error("No authenticated user");
-    const userData = JSON.parse(storedUser);
-    return userData.token;
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error("No authenticated user");
+    }
+
+    const token = await user.getIdToken(true);
+    return token;
   } catch (error) {
-    return await forceTokenRefresh();
+    console.error("Error getting token:", error);
+    throw new Error("Authentication failed");
   }
 };
 
