@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { signup } from "../../lib/auth.firebase";
 import { FirebaseError } from "firebase/app";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { auth } from "../../lib/utils/firebase";
 import { toast } from "@/app/components/ui/toast";
 import { authApi } from "../../lib/api/auth";
@@ -131,25 +131,59 @@ export default function UserRegistration({
       const result = await signInWithPopup(auth, googleProvider);
       const firebaseUser = result.user;
 
-      // Create user in backend
-      await authApi.createUser(firebaseUser);
+      if (!firebaseUser) {
+        throw new Error("Google authentication failed");
+      }
 
-      const user = {
-        id: firebaseUser.uid,
-        name: firebaseUser.displayName || firebaseUser.email?.split("@")[0],
-        email: firebaseUser.email,
-        createdAt: firebaseUser.metadata.creationTime,
-        isNewUser: true,
-      };
+      const idToken = await firebaseUser.getIdToken();
 
-      onUserCreated(user);
-      onViewChange("home");
-      toast.success("Signed up with Google!");
+      try {
+        await authApi.getCurrentUser(idToken);
+        const user = {
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || firebaseUser.email?.split("@")[0],
+          email: firebaseUser.email,
+          provider: "google",
+          createdAt: firebaseUser.metadata.creationTime,
+          lastLogin: new Date().toISOString(),
+          token: idToken,
+        };
+
+        localStorage.setItem("barqpix_user", JSON.stringify(user));
+        onUserCreated(user);
+        onViewChange("home");
+        toast.success("Signed in with Google!");
+      } catch (error: any) {
+        console.log("User not found, creating new account...");
+        try {
+          await authApi.createUser(firebaseUser);
+
+          const user = {
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || firebaseUser.email?.split("@")[0],
+            email: firebaseUser.email,
+            provider: "google",
+            createdAt: firebaseUser.metadata.creationTime,
+            lastLogin: new Date().toISOString(),
+            token: idToken,
+            isNewUser: true,
+          };
+
+          localStorage.setItem("barqpix_user", JSON.stringify(user));
+          onUserCreated(user);
+          onViewChange("home");
+          toast.success("Account created and signed in with Google!");
+        } catch (createError: any) {
+          await signOut(auth);
+          localStorage.removeItem("barqpix_user");
+          throw new Error("Failed to create user account. Please try again.");
+        }
+      }
     } catch (err: any) {
       if (err instanceof FirebaseError) {
         toast.error(err.message);
       } else {
-        toast.error(`Failed to sign up with Google. Please try again.`);
+        toast.error(`Failed to continue with Google. Please try again.`);
       }
     } finally {
       setLoading(false);
@@ -381,7 +415,7 @@ export default function UserRegistration({
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Or sign up with
+                Or continue with
               </span>
             </div>
           </div>
@@ -410,7 +444,7 @@ export default function UserRegistration({
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              Sign up with Google
+              Continue with Google
             </Button>
           </div>
 
