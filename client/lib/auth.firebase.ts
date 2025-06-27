@@ -29,7 +29,7 @@ const setupTokenRefresh = (user: any) => {
     }
   };
 
-  const refreshInterval = 30 * 60 * 1000; // 30 minutes in milliseconds
+  const refreshInterval = 30 * 60 * 1000;
   tokenRefreshTimeout = setTimeout(refreshToken, refreshInterval);
 
   refreshToken();
