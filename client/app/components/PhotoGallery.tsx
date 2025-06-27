@@ -82,32 +82,26 @@ export default function PhotoGallery({
     console.log("PhotoGallery - auth.currentUser:", auth.currentUser);
   }, [user, eventId]);
 
-  // WebSocket connection for real-time notifications
   const { connect, disconnect } = useWebSocket(eventId || null);
 
   useEffect(() => {
-    // Connect to WebSocket when component mounts
     if (eventId) {
       connect();
     }
 
-    // Cleanup on unmount
     return () => {
       disconnect();
     };
   }, [eventId, connect, disconnect]);
 
-  // Fetch photos based on context
   useEffect(() => {
     const fetchAllUserEventPhotos = async () => {
       if (!user?.id) return;
       setLoading(true);
       try {
-        // 1. Fetch all events created by the user
         const { events = [] } = await eventApi.getUserEvents();
         setUserEvents(events);
         let allPhotos: Photo[] = [];
-        // 2. For each event, fetch its photos
         for (const event of events) {
           if (event.organizer === user.id) {
             try {
@@ -149,18 +143,15 @@ export default function PhotoGallery({
       try {
         let data;
         if (eventId?.startsWith("quick_")) {
-          // Fetch quick share photos
           const quickId = eventId.replace("quick_", "");
           data = await photoApi.getQuickSharePhotos(quickId, 50, 0);
           setPhotos(data.photos || []);
           setHasMore(data.hasMore || false);
         } else if (eventId) {
-          // Fetch ALL photos for the event, regardless of userId
           data = await photoApi.getEventPhotos(eventId, 50, "");
           setPhotos(data.photos || []);
           setHasMore(data.hasMore || false);
         } else {
-          // Fetch all photos from all events created by the user
           await fetchAllUserEventPhotos();
           return;
         }
@@ -174,7 +165,6 @@ export default function PhotoGallery({
     fetchPhotos();
   }, [user?.id, user?.isGuest, eventId]);
 
-  // Load more photos
   const loadMorePhotos = async () => {
     if (loadingMore || !hasMore) return;
 
@@ -186,7 +176,6 @@ export default function PhotoGallery({
       let data;
 
       if (eventId?.startsWith("quick_")) {
-        // Load more quick share photos
         const quickId = eventId.replace("quick_", "");
         console.log(
           "PhotoGallery - Loading more quick share photos for quickId:",
@@ -204,7 +193,6 @@ export default function PhotoGallery({
         );
         data = await photoApi.getEventPhotos(eventId, 50, "");
       } else {
-        // Load more user photos - only if user is properly authenticated
         if (!user?.isGuest && user?.id) {
           console.log(
             "PhotoGallery - Loading more user photos for user:",
@@ -237,7 +225,6 @@ export default function PhotoGallery({
     }
   };
 
-  // Filter and group photos for display
   const filteredPhotos =
     selectedEventId === "all"
       ? photos
@@ -271,10 +258,8 @@ export default function PhotoGallery({
 
   useEffect(() => {
     if (fullscreenIndex !== null) {
-      // Disable background scroll
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
-      // Arrow key navigation
       const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === "ArrowLeft" && fullscreenIndex > 0) {
           setFullscreenIndex((i) => (i !== null && i > 0 ? i - 1 : i));
@@ -298,7 +283,6 @@ export default function PhotoGallery({
   }, [fullscreenIndex, filteredPhotos.length]);
 
   const handleDownloadAll = () => {
-    // In production, this would create a zip file or download individual photos
     console.log("Downloading all photos...");
   };
 
@@ -365,7 +349,6 @@ export default function PhotoGallery({
     touchStartX.current = null;
   };
 
-  // Helper to get event organizer for current event (if available)
   const currentEvent = eventId && userEvents.find((e) => e.id === eventId);
   const isOwner = user && currentEvent && user.id === currentEvent.organizer;
 
@@ -399,7 +382,6 @@ export default function PhotoGallery({
     );
   }
 
-  // Additional check for guest users trying to access user photos
   if (user?.isGuest && !eventId?.startsWith("quick_")) {
     return (
       <Card className="max-w-md mx-auto">
