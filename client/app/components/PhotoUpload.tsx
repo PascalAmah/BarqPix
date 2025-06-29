@@ -33,6 +33,11 @@ import type { Event } from "../types";
 
 interface PhotoUploadProps {
   userId: string | null;
+  user?: {
+    id: string;
+    name: string;
+    email?: string;
+  } | null;
   eventId?: string | null;
   eventDetails?: {
     title: string;
@@ -44,6 +49,7 @@ interface PhotoUploadProps {
 
 export default function PhotoUpload({
   userId,
+  user,
   eventId,
   eventDetails,
   onViewChange,
@@ -68,7 +74,6 @@ export default function PhotoUpload({
   const [scanning, setScanning] = useState(false);
   const [joiningEvent, setJoiningEvent] = useState(false);
 
-  // Load user events for logged-in users
   useEffect(() => {
     const loadUserEvents = async () => {
       if (userId && !eventId) {
@@ -205,7 +210,13 @@ export default function PhotoUpload({
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return;
 
-    if (userId && !selectedEventId) {
+    // Only require event selection for authenticated users who aren't doing quick share
+    if (
+      userId &&
+      !selectedEventId &&
+      !eventId?.startsWith("quick_") &&
+      !eventId
+    ) {
       toast.error("Please select an event to upload photos to");
       return;
     }
@@ -220,13 +231,24 @@ export default function PhotoUpload({
         formData.append("tags[]", (photoMeta[i]?.tags || []).join(","));
       });
 
-      const endpoint = selectedEventId
-        ? `${
-            process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
-          }/api/photos/${selectedEventId}`
-        : `${
-            process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
-          }/api/photos/quick/${userId || "anonymous"}`;
+      let endpoint;
+      if (eventId?.startsWith("quick_")) {
+        // Quick share upload
+        const quickId = eventId.replace("quick_", "");
+        endpoint = `${
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+        }/api/photos/quick/${quickId}`;
+      } else if (selectedEventId) {
+        // Event upload
+        endpoint = `${
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+        }/api/photos/${selectedEventId}`;
+      } else {
+        // Fallback quick share for anonymous users
+        endpoint = `${
+          process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
+        }/api/photos/quick/${userId || "anonymous"}`;
+      }
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -246,14 +268,25 @@ export default function PhotoUpload({
       setUploadedCount(selectedFiles.length);
       setUploading(false);
 
+      const uploadTarget = eventId?.startsWith("quick_")
+        ? "quick share"
+        : selectedEventDetails?.title || "the event";
+
       toast.success(
         `Successfully uploaded ${selectedFiles.length} photo${
           selectedFiles.length > 1 ? "s" : ""
-        } to ${selectedEventDetails?.title || "the event"}!`
+        } to ${uploadTarget}!`
       );
 
       setTimeout(() => {
-        onViewChange("gallery");
+        // Navigate to appropriate view based on user type and upload type
+        if (eventId?.startsWith("quick_") || (!userId && !selectedEventId)) {
+          // Quick share upload - go to quick share viewer for guest users
+          onViewChange("quick-share");
+        } else {
+          // Regular event upload - go to gallery
+          onViewChange("gallery");
+        }
       }, 2000);
     } catch (error) {
       console.error("Upload error:", error);
@@ -276,10 +309,22 @@ export default function PhotoUpload({
         <CardHeader className="text-center">
           <CardTitle className="flex items-center justify-center gap-2">
             <Camera className="w-6 h-6" />
-            {eventDetails ? eventDetails.title : "Upload Photos"}
+            {eventId?.startsWith("quick_")
+              ? "Quick Share Photos"
+              : eventDetails
+              ? eventDetails.title
+              : "Upload Photos"}
           </CardTitle>
           <CardDescription>
-            {eventDetails ? (
+            {eventId?.startsWith("quick_") ? (
+              <div className="space-y-1">
+                <p className="text-sm">Share photos via quick share</p>
+                <p className="text-xs text-muted-foreground">
+                  Photos will be available for 1 hour and then automatically
+                  deleted
+                </p>
+              </div>
+            ) : eventDetails ? (
               <div className="space-y-1">
                 <p className="text-sm">Share your photos for this event</p>
                 <p className="text-xs text-muted-foreground">
@@ -291,13 +336,13 @@ export default function PhotoUpload({
             ) : (
               <p>
                 Photos will be linked to{" "}
-                {userId ? `user: ${userId}` : "this event"}
+                {userId ? `user: ${user?.name || userId}` : "this event"}
               </p>
             )}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {userId && !eventId && (
+          {userId && !eventId && !eventId?.startsWith("quick_") && (
             <div className="mb-6 space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Select Event</label>
@@ -529,7 +574,13 @@ export default function PhotoUpload({
 
               <Button
                 onClick={handleUpload}
-                disabled={uploading || (!!userId && !selectedEventId)}
+                disabled={
+                  uploading ||
+                  (!!userId &&
+                    !selectedEventId &&
+                    !eventId?.startsWith("quick_") &&
+                    !eventId)
+                }
                 className="w-full"
               >
                 {uploading

@@ -74,8 +74,11 @@ export default function SignIn({
 
       try {
         await authApi.getCurrentUser(token);
-      } catch (error) {
-        throw new Error("Failed to get user data from server");
+      } catch (error: any) {
+        console.error("User data not found:", error);
+        await signOut(auth);
+        localStorage.removeItem("barqpix_user");
+        throw new Error("User account not found. Please sign up first.");
       }
 
       const user = {
@@ -149,31 +152,55 @@ export default function SignIn({
 
       try {
         await authApi.getCurrentUser(idToken);
-      } catch (error) {
-        throw new Error("Failed to get user data from server");
+        const user = {
+          id: firebaseUser.uid,
+          name: firebaseUser.displayName || firebaseUser.email?.split("@")[0],
+          email: firebaseUser.email,
+          provider: "google",
+          createdAt: firebaseUser.metadata.creationTime,
+          lastLogin: new Date().toISOString(),
+          token: idToken,
+        };
+
+        localStorage.setItem("barqpix_user", JSON.stringify(user));
+        setupTokenRefresh(firebaseUser);
+        onUserSignedIn(user);
+        onViewChange("home");
+        toast.success("Signed in with Google!");
+      } catch (error: any) {
+        console.log("User not found, creating new account...");
+        try {
+          await authApi.createUser(firebaseUser);
+
+          const user = {
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || firebaseUser.email?.split("@")[0],
+            email: firebaseUser.email,
+            provider: "google",
+            createdAt: firebaseUser.metadata.creationTime,
+            lastLogin: new Date().toISOString(),
+            token: idToken,
+            isNewUser: true,
+          };
+
+          localStorage.setItem("barqpix_user", JSON.stringify(user));
+          setupTokenRefresh(firebaseUser);
+          onUserSignedIn(user);
+          onViewChange("home");
+          toast.success("Account created and signed in with Google!");
+        } catch (createError: any) {
+          console.error("Failed to create user:", createError);
+          await signOut(auth);
+          localStorage.removeItem("barqpix_user");
+          throw new Error("Failed to create user account. Please try again.");
+        }
       }
-
-      const user = {
-        id: firebaseUser.uid,
-        name: firebaseUser.displayName || firebaseUser.email?.split("@")[0],
-        email: firebaseUser.email,
-        provider: "google",
-        createdAt: firebaseUser.metadata.creationTime,
-        lastLogin: new Date().toISOString(),
-        token: idToken,
-      };
-
-      localStorage.setItem("barqpix_user", JSON.stringify(user));
-      setupTokenRefresh(firebaseUser);
-      onUserSignedIn(user);
-      onViewChange("home");
-      toast.success("Signed in with Google!");
     } catch (err: any) {
       if (err instanceof FirebaseError) {
         toast.error(err.message);
       } else {
         toast.error(
-          err.message || "Failed to sign in with Google. Please try again."
+          err.message || "Failed to continue with Google. Please try again."
         );
       }
 
@@ -365,7 +392,7 @@ export default function SignIn({
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Or sign in with
+                Or continue with
               </span>
             </div>
           </div>
@@ -394,7 +421,7 @@ export default function SignIn({
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              Sign in with Google
+              Continue with Google
             </Button>
           </div>
 

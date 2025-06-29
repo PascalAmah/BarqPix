@@ -31,12 +31,14 @@ import { toast } from "../components/ui/toast";
 import type { User as UserType, Event } from "../types";
 import { eventApi } from "@/lib/api/event";
 import { qrApi } from "@/lib/api/qr";
+import { useSwipeable } from "react-swipeable";
 
 type User = UserType;
 
 interface QRCodeGeneratorProps {
   user: User | null;
   onViewChange: (view: string) => void;
+  onCreateEvent: () => void;
 }
 
 interface QRCodeData {
@@ -53,9 +55,124 @@ interface QRCodeData {
   expiresAt?: string;
 }
 
+interface SwipeableQRCodeItemProps {
+  qrCode: QRCodeData;
+  isSwiped: boolean;
+  isMobile: boolean;
+  setSwipedId: (id: string | null) => void;
+  handleDeleteQRCode: (id: string) => void;
+  loadExistingQRCode: (id: string) => void;
+}
+
+function SwipeableQRCodeItem({
+  qrCode,
+  isSwiped,
+  isMobile,
+  setSwipedId,
+  handleDeleteQRCode,
+  loadExistingQRCode,
+}: SwipeableQRCodeItemProps) {
+  const handlers = useSwipeable({
+    onSwipedLeft: () => isMobile && setSwipedId(qrCode.id),
+    onSwipedRight: () => isMobile && setSwipedId(null),
+    preventScrollOnSwipe: true,
+    trackMouse: false,
+  });
+
+  return (
+    <div
+      key={qrCode.id}
+      {...(isMobile ? handlers : {})}
+      className={`relative flex items-center justify-between p-4 border rounded-lg transition-colors bg-white overflow-hidden ${
+        isMobile && isSwiped ? "translate-x-[-80px]" : ""
+      }`}
+      style={{
+        touchAction: "pan-y",
+        transition: "transform 0.2s",
+        transform: isMobile && isSwiped ? "translateX(-80px)" : "translateX(0)",
+      }}
+    >
+      {/* Delete action, only visible when swiped on mobile */}
+      {isMobile && isSwiped && (
+        <button
+          className="absolute right-0 top-0 h-full w-20 bg-red-600 text-white flex items-center justify-center z-10"
+          onClick={() => handleDeleteQRCode(qrCode.id)}
+        >
+          <Trash2 className="w-6 h-6" />
+        </button>
+      )}
+      {/* Main content */}
+      <div className="flex items-center space-x-4">
+        <div className="w-12 h-12">
+          <img
+            src={qrCode.qrCodeData}
+            alt={qrCode.title}
+            className="w-full h-full object-contain"
+          />
+        </div>
+        <div>
+          <h4 className="font-medium">{qrCode.title}</h4>
+          <p className="text-sm text-muted-foreground">
+            {qrCode.type === "event" ? "Event QR Code" : "Quick Share Code"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Created: {new Date(qrCode.createdAt).toLocaleDateString()}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center space-x-2">
+        <span className="text-sm text-green-600">
+          {qrCode.scanCount} scan
+          {qrCode.scanCount !== 1 ? "s" : ""}
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => loadExistingQRCode(qrCode.id)}
+        >
+          View
+        </Button>
+        {/* Desktop delete button, always visible on desktop */}
+        {!isMobile && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDeleteQRCode(qrCode.id)}
+            className="text-red-600 hover:text-red-700"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const getCacheKey = (userId: string) => `events_${userId}`;
+
+const getCachedEvents = (userId: string) => {
+  const cache = localStorage.getItem(getCacheKey(userId));
+  if (!cache) return null;
+  try {
+    const { events } = JSON.parse(cache);
+    return events;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedEvents = (userId: string, events: any[]) => {
+  localStorage.setItem(getCacheKey(userId), JSON.stringify({ events }));
+};
+
+const clearCachedEvents = (userId: string) => {
+  localStorage.removeItem(getCacheKey(userId));
+};
+
 export default function QRCodeGenerator({
   user,
   onViewChange,
+  onCreateEvent,
 }: QRCodeGeneratorProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -67,8 +184,28 @@ export default function QRCodeGenerator({
   const [previewPhotos, setPreviewPhotos] = useState<string[]>([]);
   const [showStats, setShowStats] = useState(false);
   const [qrStats, setQrStats] = useState<any>(null);
+  const [swipedId, setSwipedId] = useState<string | null>(null);
+  const [previousUserId, setPreviousUserId] = useState<string | null>(null);
+
+  // Handle logout - clear cache
+  useEffect(() => {
+    if (!user && previousUserId) {
+      clearCachedEvents(previousUserId);
+      setPreviousUserId(null);
+      setUserEvents([]);
+    } else if (user?.id) {
+      setPreviousUserId(user.id);
+    }
+  }, [user, previousUserId]);
 
   const handleEventChange = (value: string) => {
+    console.log("handleEventChange called with value:", value);
+    console.log("Available events:", userEvents);
+    console.log(
+      "Selected event:",
+      userEvents.find((e) => e.id === value)
+    );
+
     setSelectedEvent(value);
     setCurrentQRCode(null);
     setShowStats(false);
@@ -81,15 +218,38 @@ export default function QRCodeGenerator({
         return;
       }
 
+      // Check if we have a newly created event
+      const newEventId = localStorage.getItem("barqpix_current_event");
+      console.log("New event ID from localStorage:", newEventId);
+
+      // Check cache first
+      const cached = getCachedEvents(user.id);
+      if (cached && !newEventId) {
+        console.log("Using cached events:", cached);
+        setUserEvents(cached);
+        setIsLoading(false);
+
+        // Still load QR codes
+        try {
+          const { qrCodes } = await qrApi.getUserQRCodes();
+          setUserQRCodes(qrCodes);
+        } catch (error) {
+          console.error("Failed to load QR codes:", error);
+        }
+        return;
+      }
+
       try {
         const { events } = await eventApi.getUserEvents();
+        console.log("Fetched events from API:", events);
         setUserEvents(events);
+        setCachedEvents(user.id, events);
 
         const { qrCodes } = await qrApi.getUserQRCodes();
         setUserQRCodes(qrCodes);
 
-        const newEventId = localStorage.getItem("barqpix_current_event");
         if (newEventId) {
+          console.log("Setting selected event to:", newEventId);
           handleEventChange(newEventId);
           localStorage.removeItem("barqpix_current_event");
         }
@@ -330,22 +490,11 @@ export default function QRCodeGenerator({
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <Button
                   variant="outline"
-                  onClick={() =>
-                    onViewChange(user?.isGuest ? "register" : "create-event")
-                  }
+                  onClick={onCreateEvent}
                   className="w-full sm:w-auto"
                 >
-                  {user?.isGuest ? (
-                    <>
-                      <Users className="w-4 h-4 mr-2" />
-                      Sign Up to Create Events
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Create New Event
-                    </>
-                  )}
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create New Event
                 </Button>
                 <Button
                   onClick={generateQRCode}
@@ -416,7 +565,7 @@ export default function QRCodeGenerator({
                   <Share className="w-4 h-4 mr-2" />
                   Copy Link
                 </Button>
-                {user && !user.isGuest && (
+                {/* {user && !user.isGuest && (
                   <>
                     <Button
                       variant="outline"
@@ -435,7 +584,7 @@ export default function QRCodeGenerator({
                       Delete
                     </Button>
                   </>
-                )}
+                )} */}
               </div>
 
               {/* Statistics Display */}
@@ -483,53 +632,17 @@ export default function QRCodeGenerator({
               <h3 className="font-medium text-lg">Your QR Codes</h3>
               <div className="grid gap-4">
                 {userQRCodes.map((qrCode) => (
-                  <div
+                  <SwipeableQRCodeItem
                     key={qrCode.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12">
-                        <img
-                          src={qrCode.qrCodeData}
-                          alt={qrCode.title}
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-                      <div>
-                        <h4 className="font-medium">{qrCode.title}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {qrCode.type === "event"
-                            ? "Event QR Code"
-                            : "Quick Share Code"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Created:{" "}
-                          {new Date(qrCode.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm text-green-600">
-                        {qrCode.scanCount} scan
-                        {qrCode.scanCount !== 1 ? "s" : ""}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => loadExistingQRCode(qrCode.id)}
-                      >
-                        View
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteQRCode(qrCode.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
+                    qrCode={qrCode}
+                    isSwiped={swipedId === qrCode.id}
+                    isMobile={
+                      typeof window !== "undefined" && window.innerWidth < 768
+                    }
+                    setSwipedId={setSwipedId}
+                    handleDeleteQRCode={handleDeleteQRCode}
+                    loadExistingQRCode={loadExistingQRCode}
+                  />
                 ))}
               </div>
             </div>

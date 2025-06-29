@@ -1,16 +1,20 @@
 import { Event } from "@/app/types";
-import { forceTokenRefresh } from "../auth.firebase";
+import { auth } from "../utils/firebase";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 const getToken = async () => {
   try {
-    const storedUser = localStorage.getItem("barqpix_user");
-    if (!storedUser) throw new Error("No authenticated user");
-    const userData = JSON.parse(storedUser);
-    return userData.token;
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error("No authenticated user");
+    }
+
+    const token = await user.getIdToken(true);
+    return token;
   } catch (error) {
-    return await forceTokenRefresh();
+    console.error("Error getting token:", error);
+    throw new Error("Authentication failed");
   }
 };
 
@@ -118,6 +122,18 @@ export const eventApi = {
 
     if (!response.ok) {
       throw new Error("Failed to fetch public event data");
+    }
+
+    return response.json();
+  },
+
+  async searchEvents(title: string) {
+    const response = await fetch(
+      `${API_URL}/api/events/search?title=${encodeURIComponent(title)}`
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to search events");
     }
 
     return response.json();
