@@ -26,7 +26,7 @@ import SignIn from "./components/SignIn";
 import { toast } from "./components/ui/toast";
 import EventList from "./components/EventList";
 import { eventApi } from "@/lib/api/event";
-import QuickShareViewer from "./components/QuickShareViewer";
+// import QuickShareViewer from "./components/QuickShareViewer";
 import { authApi } from "@/lib/api/auth";
 
 export default function BarqPixApp() {
@@ -317,13 +317,13 @@ export default function BarqPixApp() {
             onViewChange={setCurrentView}
           />
         );
-      case "quick-share":
-        return (
-          <QuickShareViewer
-            quickId={currentEventId?.replace("quick_", "") || ""}
-            onViewChange={setCurrentView}
-          />
-        );
+      // case "quick-share":
+      //   return (
+      //     <QuickShareViewer
+      //       quickId={currentEventId?.replace("quick_", "") || ""}
+      //       onViewChange={setCurrentView}
+      //     />
+      //   );
       case "create-event":
         return (
           <CreateEvent
