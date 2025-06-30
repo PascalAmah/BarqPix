@@ -1,6 +1,6 @@
 import { cloudinary } from "../config/cloudinary.js";
 import { db } from "../config/firebase.js";
-import { broadcastToEvent } from "../app.js";
+import { broadcastToEvent } from "../utils/socketManager.js";
 
 export const photoController = {
   uploadEventCover: async (req, res) => {
@@ -234,7 +234,6 @@ export const photoController = {
       res.status(500).json({ error: "Failed to delete photo" });
     }
   },
-
 
   getEventPhotos: async (req, res) => {
     try {
