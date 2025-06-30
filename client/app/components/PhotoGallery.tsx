@@ -22,7 +22,7 @@ import {
   Lock,
   Loader2,
 } from "lucide-react";
-import { useWebSocket } from "@/lib/utils/websocket";
+// import { useWebSocket } from "@/lib/utils/websocket";
 import { photoApi } from "@/lib/api/photo";
 import { toast } from "@/app/components/ui/toast";
 import { auth } from "@/lib/utils/firebase";
@@ -82,17 +82,17 @@ export default function PhotoGallery({
     console.log("PhotoGallery - auth.currentUser:", auth.currentUser);
   }, [user, eventId]);
 
-  const { connect, disconnect } = useWebSocket(eventId || null);
+  // const { connect, disconnect } = useWebSocket(eventId || null);
 
-  useEffect(() => {
-    if (eventId) {
-      connect();
-    }
+  // useEffect(() => {
+  //   if (eventId) {
+  //     connect();
+  //   }
 
-    return () => {
-      disconnect();
-    };
-  }, [eventId, connect, disconnect]);
+  //   return () => {
+  //     disconnect();
+  //   };
+  // }, [eventId, connect, disconnect]);
 
   useEffect(() => {
     const fetchAllUserEventPhotos = async () => {
