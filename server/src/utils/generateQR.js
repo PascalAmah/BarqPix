@@ -4,7 +4,7 @@ export async function generateQRCode(identifier, options = {}) {
   try {
     const {
       type = "event",
-      baseUrl = process.env.CLIENT_URL || "http://localhost:3001",
+      baseUrl = process.env.CLIENT_URL || "",
       width = 300,
       margin = 2,
       color = {
