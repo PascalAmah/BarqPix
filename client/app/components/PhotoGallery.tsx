@@ -47,6 +47,61 @@ interface Photo {
   eventId?: string;
 }
 
+// Photo Gallery cache functions
+const getPhotosCacheKey = (userId: string, eventId?: string) => {
+  if (eventId?.startsWith("quick_")) {
+    return `photos_quick_${eventId.replace("quick_", "")}`;
+  }
+  return eventId ? `photos_event_${eventId}` : `photos_user_${userId}`;
+};
+
+const getCachedPhotos = (userId: string, eventId?: string) => {
+  const cacheKey = getPhotosCacheKey(userId, eventId);
+  const cache = localStorage.getItem(cacheKey);
+  if (!cache) return null;
+  try {
+    const { photos, timestamp } = JSON.parse(cache);
+    // Cache expires after 5 minutes for better real-time updates
+    if (Date.now() - timestamp > 5 * 60 * 1000) {
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+    return photos;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedPhotos = (userId: string, photos: Photo[], eventId?: string) => {
+  const cacheKey = getPhotosCacheKey(userId, eventId);
+  localStorage.setItem(
+    cacheKey,
+    JSON.stringify({
+      photos,
+      timestamp: Date.now(),
+    })
+  );
+};
+
+const clearCachedPhotos = (userId: string, eventId?: string) => {
+  const cacheKey = getPhotosCacheKey(userId, eventId);
+  localStorage.removeItem(cacheKey);
+};
+
+// Clear all photo caches for a user
+const clearAllPhotoCaches = (userId: string) => {
+  const keys = Object.keys(localStorage);
+  keys.forEach((key) => {
+    if (
+      key.startsWith(`photos_user_${userId}`) ||
+      key.startsWith(`photos_event_`) ||
+      key.startsWith(`photos_quick_`)
+    ) {
+      localStorage.removeItem(key);
+    }
+  });
+};
+
 export default function PhotoGallery({
   user,
   eventId,
@@ -69,6 +124,7 @@ export default function PhotoGallery({
     string | null
   >(null);
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+  const [previousUserId, setPreviousUserId] = useState<string | null>(null);
 
   const prevFilteredLength = useRef(0);
   const touchStartX = useRef<number | null>(null);
@@ -95,65 +151,75 @@ export default function PhotoGallery({
   // }, [eventId, connect, disconnect]);
 
   useEffect(() => {
-    const fetchAllUserEventPhotos = async () => {
-      if (!user?.id) return;
-      setLoading(true);
-      try {
-        const { events = [] } = await eventApi.getUserEvents();
-        setUserEvents(events);
-        let allPhotos: Photo[] = [];
-        for (const event of events) {
-          if (event.organizer === user.id) {
-            try {
-              const res = await photoApi.getEventPhotos(event.id, 100, "");
-              if (res.photos) {
-                allPhotos = allPhotos.concat(
-                  res.photos.map((photo: Photo) => ({
-                    ...photo,
-                    eventTitle: event.title,
-                    eventId: event.id,
-                  }))
-                );
-              }
-            } catch (err) {
-              console.error(
-                `Failed to fetch photos for event ${event.id}:`,
-                err
-              );
-            }
-          }
-        }
-        allPhotos.sort(
-          (a, b) =>
-            new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-        );
-        setPhotos(allPhotos);
-        setHasMore(false);
-      } catch (error) {
-        setPhotos([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     const fetchPhotos = async () => {
       if (!user?.id && !eventId?.startsWith("quick_")) return;
       setLoading(true);
       setOffset(0);
+
+      // Check cache first
+      const cachedPhotos = getCachedPhotos(
+        user?.id || "anonymous",
+        eventId || undefined
+      );
+      if (cachedPhotos) {
+        console.log("Using cached photos:", cachedPhotos.length);
+        setPhotos(cachedPhotos);
+        setLoading(false);
+        return;
+      }
+
       try {
         let data;
         if (eventId?.startsWith("quick_")) {
           const quickId = eventId.replace("quick_", "");
           data = await photoApi.getQuickSharePhotos(quickId, 50, 0);
           setPhotos(data.photos || []);
+          setCachedPhotos("anonymous", data.photos || [], eventId);
           setHasMore(data.hasMore || false);
         } else if (eventId) {
           data = await photoApi.getEventPhotos(eventId, 50, "");
           setPhotos(data.photos || []);
+          setCachedPhotos(user?.id || "anonymous", data.photos || [], eventId);
           setHasMore(data.hasMore || false);
         } else {
-          await fetchAllUserEventPhotos();
-          return;
+          try {
+            const { events = [] } = await eventApi.getUserEvents();
+            setUserEvents(events);
+
+            let allPhotos: Photo[] = [];
+            for (const event of events) {
+              if (event.organizer === user.id) {
+                try {
+                  const res = await photoApi.getEventPhotos(event.id, 100, "");
+                  if (res.photos) {
+                    allPhotos = allPhotos.concat(
+                      res.photos.map((photo: Photo) => ({
+                        ...photo,
+                        eventTitle: event.title,
+                        eventId: event.id,
+                      }))
+                    );
+                  }
+                } catch (err) {
+                  console.error(
+                    `Failed to fetch photos for event ${event.id}:`,
+                    err
+                  );
+                }
+              }
+            }
+            allPhotos.sort(
+              (a, b) =>
+                new Date(b.uploadedAt).getTime() -
+                new Date(a.uploadedAt).getTime()
+            );
+            setPhotos(allPhotos);
+            setCachedPhotos(user.id, allPhotos);
+            setHasMore(false);
+          } catch (error) {
+            console.error("Failed to fetch user events and photos:", error);
+            setPhotos([]);
+          }
         }
       } catch (error) {
         setPhotos([]);
@@ -214,7 +280,15 @@ export default function PhotoGallery({
         "PhotoGallery - Loaded additional photos:",
         data.photos?.length || 0
       );
-      setPhotos((prev) => [...prev, ...(data.photos || [])]);
+      const updatedPhotos = [...photos, ...(data.photos || [])];
+      setPhotos(updatedPhotos);
+
+      if (user?.id) {
+        setCachedPhotos(user.id, updatedPhotos, eventId || undefined);
+      } else if (eventId?.startsWith("quick_")) {
+        setCachedPhotos("anonymous", updatedPhotos, eventId);
+      }
+
       setHasMore(data.hasMore || false);
       setOffset(newOffset);
     } catch (error) {
@@ -357,7 +431,16 @@ export default function PhotoGallery({
     setDeletingPhotoId(photoId);
     try {
       await photoApi.deletePhoto(eventId, photoId);
-      setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+      const updatedPhotos = photos.filter((p) => p.id !== photoId);
+      setPhotos(updatedPhotos);
+
+      // Update cache
+      if (user?.id) {
+        setCachedPhotos(user.id, updatedPhotos, eventId);
+      } else if (eventId?.startsWith("quick_")) {
+        setCachedPhotos("anonymous", updatedPhotos, eventId);
+      }
+
       toast.success("Photo deleted successfully");
     } catch (error) {
       toast.error("Failed to delete photo");
@@ -366,6 +449,34 @@ export default function PhotoGallery({
       setConfirmDeletePhotoId(null);
     }
   };
+
+  // Handle logout - clear cache
+  useEffect(() => {
+    if (!user && previousUserId) {
+      clearAllPhotoCaches(previousUserId);
+      setPreviousUserId(null);
+      setPhotos([]);
+      setUserEvents([]);
+    } else if (user?.id) {
+      setPreviousUserId(user.id);
+    }
+  }, [user, previousUserId]);
+
+  useEffect(() => {
+    const loadUserEvents = async () => {
+      if (!user?.id || user?.isGuest) return;
+
+      try {
+        const { events = [] } = await eventApi.getUserEvents();
+        setUserEvents(events);
+      } catch (error) {
+        console.error("Failed to load user events:", error);
+        setUserEvents([]);
+      }
+    };
+
+    loadUserEvents();
+  }, [user?.id, user?.isGuest]);
 
   if (!user?.id && !eventId?.startsWith("quick_")) {
     return (
@@ -515,69 +626,74 @@ export default function PhotoGallery({
               <div key={eventId} className="mb-8">
                 <h2 className="text-lg font-bold mb-2">{group.eventTitle}</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {group.photos.map((photo, idx) => (
-                    <div
-                      key={photo.id}
-                      className="group relative"
-                      onClick={() => setFullscreenIndex(idx)}
-                    >
-                      <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer">
-                        <img
-                          src={photo.url || "/placeholder.svg"}
-                          alt={photo.caption || "Photo"}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        />
-                      </div>
-                      <div className="mt-2 space-y-1">
-                        {photo.caption && (
-                          <p className="text-xs font-medium text-foreground truncate">
-                            {photo.caption}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground truncate">
-                          {group.eventTitle}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(photo.uploadedAt).toLocaleDateString()}
-                        </p>
-                        {photo.tags && photo.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {photo.tags.slice(0, 2).map((tag, tagIdx) => (
-                              <span
-                                key={tagIdx}
-                                className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                            {photo.tags.length > 2 && (
-                              <span className="text-xs text-muted-foreground">
-                                +{photo.tags.length - 2}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      {isOwner && (
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="absolute top-2 right-2 z-10"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setConfirmDeletePhotoId(photo.id);
-                          }}
-                          disabled={deletingPhotoId === photo.id}
-                        >
-                          {deletingPhotoId === photo.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <X className="w-4 h-4" />
+                  {group.photos.map((photo, groupIdx) => {
+                    const globalIdx = filteredPhotos.findIndex(
+                      (p) => p.id === photo.id
+                    );
+                    return (
+                      <div
+                        key={photo.id}
+                        className="group relative"
+                        onClick={() => setFullscreenIndex(globalIdx)}
+                      >
+                        <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden cursor-pointer">
+                          <img
+                            src={photo.url || "/placeholder.svg"}
+                            alt={photo.caption || "Photo"}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          />
+                        </div>
+                        <div className="mt-2 space-y-1">
+                          {photo.caption && (
+                            <p className="text-xs font-medium text-foreground truncate">
+                              {photo.caption}
+                            </p>
                           )}
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+                          <p className="text-xs text-muted-foreground truncate">
+                            {group.eventTitle}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(photo.uploadedAt).toLocaleDateString()}
+                          </p>
+                          {photo.tags && photo.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {photo.tags.slice(0, 2).map((tag, tagIdx) => (
+                                <span
+                                  key={tagIdx}
+                                  className="text-xs bg-blue-100 text-blue-800 px-1 py-0.5 rounded"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                              {photo.tags.length > 2 && (
+                                <span className="text-xs text-muted-foreground">
+                                  +{photo.tags.length - 2}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        {isOwner && (
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            className="absolute top-2 right-2 z-10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmDeletePhotoId(photo.id);
+                            }}
+                            disabled={deletingPhotoId === photo.id}
+                          >
+                            {deletingPhotoId === photo.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <X className="w-4 h-4" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))}
