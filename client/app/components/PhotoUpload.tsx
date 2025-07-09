@@ -45,6 +45,8 @@ interface PhotoUploadProps {
     endDate: string;
   };
   onViewChange: (view: string) => void;
+  onEventEnded?: () => void;
+  quickshareTitle?: string | null;
 }
 
 export default function PhotoUpload({
@@ -53,6 +55,8 @@ export default function PhotoUpload({
   eventId,
   eventDetails,
   onViewChange,
+  onEventEnded,
+  quickshareTitle,
 }: PhotoUploadProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -74,6 +78,10 @@ export default function PhotoUpload({
   const [scanning, setScanning] = useState(false);
   const [joiningEvent, setJoiningEvent] = useState(false);
 
+  // Check if event has ended
+  const isEventEnded =
+    eventDetails?.endDate && new Date(eventDetails.endDate) < new Date();
+
   useEffect(() => {
     const loadUserEvents = async () => {
       if (userId && !eventId) {
@@ -89,7 +97,6 @@ export default function PhotoUpload({
     loadUserEvents();
   }, [userId, eventId]);
 
-  // Update selected event details when eventId changes
   useEffect(() => {
     if (eventId) {
       setSelectedEventId(eventId);
@@ -103,7 +110,7 @@ export default function PhotoUpload({
     setSelectedEventDetails(selectedEvent || null);
   };
 
-  // New function to handle barcode scanning
+  // Function to handle barcode scanning
   const handleBarcodeScan = async (scannedData: string) => {
     setScanning(true);
     try {
@@ -145,7 +152,6 @@ export default function PhotoUpload({
     }
   };
 
-  // Simulate barcode scanning (for demo purposes)
   const simulateScan = () => {
     setScanning(true);
     setTimeout(() => {
@@ -194,7 +200,7 @@ export default function PhotoUpload({
 
   const handleAISuggest = async (index: number) => {
     setAiLoading(index);
-    // Simulate AI API call (replace with real API call as needed)
+    // To simulate AI API call
     await new Promise((resolve) => setTimeout(resolve, 1200));
     // Example AI suggestion
     const aiCaption = "A beautiful moment at the event.";
@@ -210,7 +216,6 @@ export default function PhotoUpload({
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return;
 
-    // Only require event selection for authenticated users who aren't doing quick share
     if (
       userId &&
       !selectedEventId &&
@@ -233,18 +238,15 @@ export default function PhotoUpload({
 
       let endpoint;
       if (eventId?.startsWith("quick_")) {
-        // Quick share upload
         const quickId = eventId.replace("quick_", "");
         endpoint = `${
           process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
         }/api/photos/quick/${quickId}`;
       } else if (selectedEventId) {
-        // Event upload
         endpoint = `${
           process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
         }/api/photos/${selectedEventId}`;
       } else {
-        // Fallback quick share for anonymous users
         endpoint = `${
           process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"
         }/api/photos/quick/${userId || "anonymous"}`;
@@ -257,6 +259,17 @@ export default function PhotoUpload({
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+
+        if (response.status === 410) {
+          const eventTitle = errorData.eventTitle || "this event";
+          const endDate = errorData.endDate
+            ? new Date(errorData.endDate).toLocaleString()
+            : "the end date";
+          throw new Error(
+            `Event "${eventTitle}" has ended on ${endDate}. Photo uploads are no longer allowed.`
+          );
+        }
+
         throw new Error(errorData.error || "Upload failed");
       }
 
@@ -277,20 +290,20 @@ export default function PhotoUpload({
           selectedFiles.length > 1 ? "s" : ""
         } to ${uploadTarget}!`
       );
-
-      setTimeout(() => {
-        // Navigate to appropriate view based on user type and upload type
-        if (eventId?.startsWith("quick_") || (!userId && !selectedEventId)) {
-          // Quick share upload - go to quick share viewer for guest users
-          onViewChange("quick-share");
-        } else {
-          // Regular event upload - go to gallery
-          onViewChange("gallery");
-        }
-      }, 2000);
     } catch (error) {
       console.error("Upload error:", error);
       setUploading(false);
+
+      if (error instanceof Error && error.message.includes("Event has ended")) {
+        if (eventDetails) {
+          return;
+        }
+        if (onEventEnded) {
+          onEventEnded();
+        }
+        return;
+      }
+
       const errorMessage =
         error instanceof Error ? error.message : "Upload failed";
       toast.error(`Upload failed: ${errorMessage}`);
@@ -310,7 +323,7 @@ export default function PhotoUpload({
           <CardTitle className="flex items-center justify-center gap-2">
             <Camera className="w-6 h-6" />
             {eventId?.startsWith("quick_")
-              ? "Quick Share Photos"
+              ? quickshareTitle || eventDetails?.title || "Quick Share Photos"
               : eventDetails
               ? eventDetails.title
               : "Upload Photos"}
@@ -320,7 +333,7 @@ export default function PhotoUpload({
               <div className="space-y-1">
                 <p className="text-sm">Share photos via quick share</p>
                 <p className="text-xs text-muted-foreground">
-                  Photos will be available for 1 hour and then automatically
+                  Photos will be available for 30 minutes and then automatically
                   deleted
                 </p>
               </div>
@@ -342,6 +355,26 @@ export default function PhotoUpload({
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Event ended warning */}
+          {isEventEnded && !eventId?.startsWith("quick_") && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs">!</span>
+                </div>
+                <h4 className="font-medium text-red-800">Event Has Ended</h4>
+              </div>
+              <p className="text-sm text-red-700 mb-2">
+                This event ended on{" "}
+                {new Date(eventDetails?.endDate).toLocaleString()}. Photo
+                uploads are no longer allowed for this event.
+              </p>
+              <p className="text-xs text-red-600">
+                You can still view existing photos in the gallery.
+              </p>
+            </div>
+          )}
+
           {userId && !eventId && !eventId?.startsWith("quick_") && (
             <div className="mb-6 space-y-3">
               <div className="flex items-center justify-between">
@@ -462,54 +495,82 @@ export default function PhotoUpload({
 
           <Tabs defaultValue="upload" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="upload">Upload Files</TabsTrigger>
-              <TabsTrigger value="camera">Take Photo</TabsTrigger>
+              <TabsTrigger
+                value="upload"
+                disabled={!!(isEventEnded && !eventId?.startsWith("quick_"))}
+              >
+                Upload Files
+              </TabsTrigger>
+              <TabsTrigger
+                value="camera"
+                disabled={!!(isEventEnded && !eventId?.startsWith("quick_"))}
+              >
+                Take Photo
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="upload" className="space-y-4">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                <p className="text-sm text-muted-foreground mb-4">
-                  Drag and drop photos here, or click to select
-                </p>
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  variant="outline"
-                >
-                  Select Photos
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept="image/*"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-              </div>
+              {isEventEnded && !eventId?.startsWith("quick_") ? (
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Uploads are disabled for ended events
+                  </p>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <Upload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Drag and drop photos here, or click to select
+                  </p>
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    variant="outline"
+                  >
+                    Select Photos
+                  </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="camera" className="space-y-4">
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <Camera className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                <p className="text-sm text-muted-foreground mb-4">
-                  Take a photo using your device camera
-                </p>
-                <Button
-                  onClick={() => cameraInputRef.current?.click()}
-                  variant="outline"
-                >
-                  Open Camera
-                </Button>
-                <input
-                  ref={cameraInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-              </div>
+              {isEventEnded && !eventId?.startsWith("quick_") ? (
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <Camera className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Camera uploads are disabled for ended events
+                  </p>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <Camera className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Take a photo using your device camera
+                  </p>
+                  <Button
+                    onClick={() => cameraInputRef.current?.click()}
+                    variant="outline"
+                  >
+                    Open Camera
+                  </Button>
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                  />
+                </div>
+              )}
             </TabsContent>
           </Tabs>
 
@@ -560,13 +621,20 @@ export default function PhotoUpload({
                     <Button
                       size="sm"
                       variant="outline"
-                      className="mt-2 w-full"
+                      className="mt-2 w-full text-xs sm:text-sm"
                       onClick={() => handleAISuggest(index)}
                       disabled={aiLoading === index}
                     >
-                      {aiLoading === index
-                        ? "Suggesting..."
-                        : "Suggest Caption/Tags"}
+                      {aiLoading === index ? (
+                        "Suggesting..."
+                      ) : (
+                        <>
+                          <span className="hidden sm:inline">
+                            Suggest Caption/Tags
+                          </span>
+                          <span className="sm:hidden">AI Suggest</span>
+                        </>
+                      )}
                     </Button>
                   </div>
                 ))}
@@ -579,7 +647,8 @@ export default function PhotoUpload({
                   (!!userId &&
                     !selectedEventId &&
                     !eventId?.startsWith("quick_") &&
-                    !eventId)
+                    !eventId) ||
+                  !!(isEventEnded && !eventId?.startsWith("quick_"))
                 }
                 className="w-full"
               >
@@ -593,11 +662,12 @@ export default function PhotoUpload({
           )}
 
           {uploading && (
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
               <div
-                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
                 style={{
                   width: `${(uploadedCount / selectedFiles.length) * 100}%`,
+                  minWidth: "0%",
                 }}
               />
             </div>
