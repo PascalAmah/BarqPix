@@ -72,7 +72,24 @@ export const photoController = {
         return res.status(404).json({ error: "Event not found" });
       }
 
-      console.log("Event found, processing files...");
+      const eventData = eventDoc.data();
+
+      // Check if event has ended
+      if (eventData.endDate && new Date(eventData.endDate) < new Date()) {
+        console.error(
+          "Event has ended:",
+          eventId,
+          "End date:",
+          eventData.endDate
+        );
+        return res.status(410).json({
+          error: "Event has ended",
+          eventTitle: eventData.title,
+          endDate: eventData.endDate,
+        });
+      }
+
+      console.log("Event found and active, processing files...");
 
       const uploadedPhotos = [];
 
@@ -433,12 +450,12 @@ export const photoController = {
     }
   },
 
-  // Cleanup expired quick share photos (older than 1 hour)
+  // Cleanup expired quick share photos (older than 30 minutes)
   cleanupExpiredQuickShares: async () => {
     try {
       console.log("Starting cleanup of expired quick share photos...");
 
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000); // 1 hour ago
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes ago
 
       // Get all quick share documents
       const quickSharesSnapshot = await db.collection("quickShares").get();
@@ -448,12 +465,12 @@ export const photoController = {
       for (const quickShareDoc of quickSharesSnapshot.docs) {
         const quickShareId = quickShareDoc.id;
 
-        // Get photos older than 1 hour
+        // Get photos older than 30 minutes
         const expiredPhotosSnapshot = await db
           .collection("quickShares")
           .doc(quickShareId)
           .collection("photos")
-          .where("uploadedAt", "<", oneHourAgo.toISOString())
+          .where("uploadedAt", "<", thirtyMinutesAgo.toISOString())
           .get();
 
         // Delete expired photos

@@ -1,6 +1,7 @@
 import { db } from "../config/firebase.js";
 import { generateQRCode } from "../utils/generateQR.js";
 import { v4 as uuidv4 } from "uuid";
+import { cloudinary } from "../config/cloudinary.js";
 
 export const qrController = {
   async generateEventQR(req, res) {
@@ -74,7 +75,7 @@ export const qrController = {
   async generateQuickQR(req, res) {
     try {
       const { uid } = req.user;
-      const { title, expiresIn = 24 } = req.body;
+      const { title, expiresIn = 0.5 } = req.body;
 
       if (!title || !title.trim()) {
         return res.status(400).json({ error: "Title is required" });
@@ -88,7 +89,7 @@ export const qrController = {
       const qrCodeId = uuidv4();
 
       const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + parseInt(expiresIn));
+      expiresAt.setMinutes(expiresAt.getMinutes() + parseFloat(expiresIn) * 60);
 
       const qrCodeDoc = {
         id: qrCodeId,
@@ -121,7 +122,7 @@ export const qrController = {
 
   async generateGuestQuickQR(req, res) {
     try {
-      const { title, expiresIn = 24 } = req.body; // expiresIn in hours
+      const { title, expiresIn = 0.5 } = req.body; // expiresIn in hours
 
       if (!title || !title.trim()) {
         return res.status(400).json({ error: "Title is required" });
@@ -135,7 +136,7 @@ export const qrController = {
       const qrCodeId = uuidv4();
 
       const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + parseInt(expiresIn));
+      expiresAt.setMinutes(expiresAt.getMinutes() + parseFloat(expiresIn) * 60);
 
       const qrCodeDoc = {
         id: qrCodeId,
@@ -269,13 +270,16 @@ export const qrController = {
       const { qrCodeId } = req.params;
       const { scannerId, scannerName } = req.body;
 
+      // For quick share, the qrCodeId is actually the quickId
+      // Check if it looks like a UUID (quick share ID) first
       let qrCodeQuery = db
         .collection("qrCodes")
-        .where("eventId", "==", qrCodeId);
+        .where("quickId", "==", qrCodeId);
       let qrCodeSnapshot = await qrCodeQuery.get();
 
       if (qrCodeSnapshot.empty) {
-        qrCodeQuery = db.collection("qrCodes").where("quickId", "==", qrCodeId);
+        // If not found by quickId, try by eventId
+        qrCodeQuery = db.collection("qrCodes").where("eventId", "==", qrCodeId);
         qrCodeSnapshot = await qrCodeQuery.get();
       }
 
@@ -358,6 +362,119 @@ export const qrController = {
       });
     } catch (error) {
       console.error("Error fetching QR code stats:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+
+  async deleteExpiredQuickShareQRCodes(req, res) {
+    try {
+      const now = new Date();
+      const expiredQRCodesSnapshot = await db
+        .collection("qrCodes")
+        .where("type", "==", "quick")
+        .where("expiresAt", "<", now.toISOString())
+        .get();
+
+      const deletePromises = expiredQRCodesSnapshot.docs.map(async (doc) => {
+        const qrCodeData = doc.data();
+        console.log(
+          `Deleting expired QR code: ${qrCodeData.id} (${qrCodeData.title})`
+        );
+
+        // Delete the QR code document
+        await doc.ref.delete();
+
+        // Delete associated photos from the quickShares collection
+        if (qrCodeData.quickId) {
+          try {
+            const quickSharePhotosSnapshot = await db
+              .collection("quickShares")
+              .doc(qrCodeData.quickId)
+              .collection("photos")
+              .get();
+
+            const photoDeletePromises = quickSharePhotosSnapshot.docs.map(
+              async (photoDoc) => {
+                const photoData = photoDoc.data();
+
+                // Delete from Cloudinary if publicId exists
+                if (photoData.publicId) {
+                  try {
+                    await cloudinary.uploader.destroy(photoData.publicId);
+                    console.log(
+                      `Deleted from Cloudinary: ${photoData.publicId}`
+                    );
+                  } catch (cloudinaryError) {
+                    console.error(
+                      `Failed to delete from Cloudinary: ${photoData.publicId}`,
+                      cloudinaryError
+                    );
+                  }
+                }
+
+                // Delete from Firestore
+                await photoDoc.ref.delete();
+              }
+            );
+
+            await Promise.all(photoDeletePromises);
+
+            console.log(
+              `Deleted ${quickSharePhotosSnapshot.docs.length} photos for expired QR code: ${qrCodeData.id}`
+            );
+
+            // Delete the empty quickShare document
+            await db.collection("quickShares").doc(qrCodeData.quickId).delete();
+            console.log(
+              `Deleted empty quickShare document: ${qrCodeData.quickId}`
+            );
+          } catch (photoError) {
+            console.error(
+              `Error deleting photos for QR code ${qrCodeData.id}:`,
+              photoError
+            );
+          }
+        }
+      });
+
+      await Promise.all(deletePromises);
+
+      const deletedCount = expiredQRCodesSnapshot.docs.length;
+      console.log(`Deleted ${deletedCount} expired quick share QR codes`);
+
+      if (req && res) {
+        res.json({
+          message: `Deleted ${deletedCount} expired quick share QR codes`,
+          deletedCount,
+        });
+      }
+
+      return deletedCount;
+    } catch (error) {
+      console.error("Error deleting expired quick share QR codes:", error);
+      if (req && res) {
+        res.status(500).json({ error: error.message });
+      }
+      throw error;
+    }
+  },
+
+  async deleteGuestQuickQRCode(req, res) {
+    try {
+      const { quickId } = req.params;
+      // Find the QR code by quickId
+      const qrCodeSnapshot = await db
+        .collection("qrCodes")
+        .where("quickId", "==", quickId)
+        .get();
+      if (qrCodeSnapshot.empty) {
+        return res.status(404).json({ error: "QR Code not found" });
+      }
+      const qrCodeDoc = qrCodeSnapshot.docs[0];
+      await qrCodeDoc.ref.delete();
+      // Optionally, delete associated quickShares/photos as in your cleanup logic
+      res.json({ message: "Guest QR Code deleted successfully" });
+    } catch (error) {
       res.status(500).json({ error: error.message });
     }
   },
