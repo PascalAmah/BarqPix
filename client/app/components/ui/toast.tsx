@@ -4,7 +4,7 @@ export const toast = {
   success: (message: string) => {
     sonnerToast.success(message, {
       style: {
-        background: "hsl(var(--primary-foreground) / 0.2)",
+        background: "hsl(var(--primary-foreground))",
         color: "hsl(var(--primary))",
         border: "1px solid hsl(var(--primary) / 0.2)",
       },
@@ -13,9 +13,9 @@ export const toast = {
   error: (message: string) => {
     sonnerToast.error(message, {
       style: {
-        background: "hsl(var(--primary-foreground) / 0.1)",
-        color: "hsl(var(--primary))",
-        border: "1px solid hsl(var(--primary) / 0.2)",
+        background: "hsl(var(--destructive-foreground))",
+        color: "hsl(var(--destructive))",
+        border: "1px solid hsl(var(--destructive) / 0.2)",
       },
     });
   },
