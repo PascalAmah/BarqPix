@@ -5,12 +5,15 @@ import { useParams, useRouter } from "next/navigation";
 import PhotoUpload from "../../components/PhotoUpload";
 import { toast } from "../../components/ui/toast";
 import { qrApi } from "@/lib/api/qr";
+import { Button } from "../../components/ui/button";
+import { ImageIcon } from "lucide-react";
 
 export default function QuickSharePage() {
   const params = useParams();
   const router = useRouter();
   const [eventDetails, setEventDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showViewer, setShowViewer] = useState(false);
   const quickId = params.quickId as string;
 
   useEffect(() => {
@@ -28,9 +31,9 @@ export default function QuickSharePage() {
         }
 
         setEventDetails({
-          title: qrCodeDetails.title || "Quick Share",
-          startDate: qrCodeDetails.createdAt,
-          endDate: qrCodeDetails.expiresAt,
+          title: qrCodeDetails?.title || "Quick Share",
+          startDate: qrCodeDetails?.createdAt,
+          endDate: qrCodeDetails?.expiresAt,
         });
       } catch (error) {
         console.error("Failed to load Quick Share details:", error);
@@ -57,15 +60,37 @@ export default function QuickSharePage() {
     );
   }
 
+  if (showViewer) {
+    // Import and render QuickShareViewer dynamically to avoid circular imports
+    const QuickShareViewer =
+      require("../../components/QuickShareViewer").default;
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <QuickShareViewer
+          quickId={quickId}
+          onViewChange={(view: string) => {
+            if (view === "upload") {
+              setShowViewer(false);
+            } else if (view === "home") {
+              router.push("/");
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <PhotoUpload
         userId={null}
-        eventId={quickId}
+        eventId={`quick_${quickId}`}
         eventDetails={eventDetails}
-        onViewChange={(view) => {
+        onViewChange={(view: string) => {
           if (view === "home") {
             router.push("/");
+          } else if (view === "quick-share") {
+            setShowViewer(true);
           }
         }}
       />
