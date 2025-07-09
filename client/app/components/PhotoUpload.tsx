@@ -369,9 +369,6 @@ export default function PhotoUpload({
                 {new Date(eventDetails?.endDate).toLocaleString()}. Photo
                 uploads are no longer allowed for this event.
               </p>
-              <p className="text-xs text-red-600">
-                You can still view existing photos in the gallery.
-              </p>
             </div>
           )}
 
