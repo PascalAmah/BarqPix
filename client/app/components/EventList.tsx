@@ -9,7 +9,7 @@ import {
   CardDescription,
 } from "@/app/components/ui/card";
 import { eventApi } from "@/lib/api/event";
-import { toast } from "sonner";
+import { toast } from "@/app/components/ui/toast";
 import { Calendar, MapPin, Globe, Lock, Plus } from "lucide-react";
 import { useSwipeable } from "react-swipeable";
 
@@ -191,6 +191,13 @@ const EventList: React.FC<EventListProps> = ({
               Create Event
             </Button>
           </div>
+          {/* Mobile swipe instructions */}
+          <div className="md:hidden mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              💡 <strong>Tip:</strong> Swipe left on any event to reveal the
+              delete button
+            </p>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -280,8 +287,8 @@ const EventList: React.FC<EventListProps> = ({
         </CardContent>
       </Card>
       {confirmDeleteId && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
             <div className="mb-4 font-semibold">
               Are you sure you want to delete this event?
             </div>

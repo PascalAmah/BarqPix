@@ -78,6 +78,7 @@ export default function SignIn({
         console.error("User data not found:", error);
         await signOut(auth);
         localStorage.removeItem("barqpix_user");
+        localStorage.removeItem("guest_qr_code");
         throw new Error("User account not found. Please sign up first.");
       }
 
@@ -192,6 +193,7 @@ export default function SignIn({
           console.error("Failed to create user:", createError);
           await signOut(auth);
           localStorage.removeItem("barqpix_user");
+          localStorage.removeItem("guest_qr_code");
           throw new Error("Failed to create user account. Please try again.");
         }
       }
