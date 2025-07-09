@@ -161,11 +161,6 @@ function SwipeableQRCodeItem({
             </span>
           </Button>
         )}
-        {qrCode.type === "event" && (
-          <div className="text-xs text-muted-foreground hidden sm:block">
-            Go to Photo Gallery to view images
-          </div>
-        )}
         {/* Desktop delete button, always visible on desktop */}
         {!isMobile && (
           <Button
@@ -885,6 +880,15 @@ export default function QRCodeGenerator({
           {user && userQRCodes.length > 0 && (
             <div className="mt-8 space-y-4">
               <h3 className="font-medium text-lg">Your QR Codes</h3>
+
+              {/* General Information */}
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  📸 <strong>Tip:</strong> Go to Photo Gallery to view images
+                  from your QR codes
+                </p>
+              </div>
+
               {/* Mobile swipe instructions */}
               <div className="md:hidden p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
