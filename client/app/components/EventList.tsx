@@ -9,7 +9,7 @@ import {
   CardDescription,
 } from "@/app/components/ui/card";
 import { eventApi } from "@/lib/api/event";
-import { toast } from "sonner";
+import { toast } from "@/app/components/ui/toast";
 import { Calendar, MapPin, Globe, Lock, Plus } from "lucide-react";
 import { useSwipeable } from "react-swipeable";
 
