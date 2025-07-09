@@ -176,6 +176,7 @@ export default function UserRegistration({
         } catch (createError: any) {
           await signOut(auth);
           localStorage.removeItem("barqpix_user");
+          localStorage.removeItem("guest_qr_code");
           throw new Error("Failed to create user account. Please try again.");
         }
       }
