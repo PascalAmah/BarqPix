@@ -33,7 +33,7 @@ export const qrApi = {
     return response.json();
   },
 
-  async generateQuickQR(title: string, expiresIn: number = 24) {
+  async generateQuickQR(title: string, expiresIn: number = 0.5) {
     const token = await getToken();
     const response = await fetch(`${API_URL}/api/qr/quick`, {
       method: "POST",
@@ -51,7 +51,7 @@ export const qrApi = {
     return response.json();
   },
 
-  async generateGuestQuickQR(title: string, expiresIn: number = 24) {
+  async generateGuestQuickQR(title: string, expiresIn: number = 0.5) {
     const response = await fetch(`${API_URL}/api/qr/quick/guest`, {
       method: "POST",
       headers: {
@@ -145,6 +145,16 @@ export const qrApi = {
       throw new Error("Failed to fetch QR code statistics");
     }
 
+    return response.json();
+  },
+
+  async deleteGuestQuickQRCode(quickId: string) {
+    const response = await fetch(`${API_URL}/api/qr/quick/guest/${quickId}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      throw new Error("Failed to delete guest QR code");
+    }
     return response.json();
   },
 };
