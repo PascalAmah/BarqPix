@@ -318,6 +318,15 @@ export default function PhotoUpload({
 
   return (
     <div className="max-w-2xl mx-auto">
+      <div className="text-center space-y-4">
+        <div className="flex justify-center">
+          <img
+            src="/barqpix_logo1.webp"
+            alt="BarqPix"
+            className="h-16 object-contain mb-4"
+          />
+        </div>
+      </div>
       <Card>
         <CardHeader className="text-center">
           <CardTitle className="flex items-center justify-center gap-2">
